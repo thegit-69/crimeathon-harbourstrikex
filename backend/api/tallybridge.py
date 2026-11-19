@@ -95,7 +95,7 @@ async def trigger_sync(
     db: AsyncSession = Depends(get_db),
 ):
     job = SyncJob(
-        id=f"SYNC-{8825 + int(uuid.uuid4().int % 50)}",
+        id=f"SYNC-{8825 + int(uuid.uuid4().int % 100000)}",
         name=body.name, target=body.target,
         last_run=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         status="Completed",

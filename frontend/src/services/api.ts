@@ -429,6 +429,12 @@ export const bluevaultApi = {
     });
   },
 
+  deleteDocument: async (docId: string): Promise<void> => {
+    return apiRequest<void>(`/api/storage/documents/${encodeURIComponent(docId)}`, {
+      method: 'DELETE',
+    });
+  },
+
   getKeys: async (): Promise<StorageKeyDto[]> => {
     return apiRequest<StorageKeyDto[]>('/api/storage/keys');
   },
@@ -442,6 +448,12 @@ export const bluevaultApi = {
     return apiRequest<StorageKeyDto>('/api/storage/keys', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  revokeKey: async (keyId: string): Promise<void> => {
+    return apiRequest<void>(`/api/storage/keys/${keyId}`, {
+      method: 'DELETE',
     });
   },
 

@@ -39,6 +39,42 @@ async def add_document(
     return doc
 
 
+@router.delete("/documents/{doc_id}", status_code=204)
+async def delete_document(
+    doc_id: str,
+    actor: dict = Depends(get_current_actor),
+    db: AsyncSession = Depends(get_db),
+):
+    doc = await db.get(Document, doc_id)
+    if not doc:
+        q = select(Document).where(Document.name == doc_id)
+        res = await db.execute(q)
+        doc = res.scalars().first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    log = StorageAccessLog(
+        id=f"bv-{uuid.uuid4().hex[:10]}",
+        principal=actor["actor"], path=doc.name or doc_id,
+        source_ip="unknown", action="delete",
+    )
+    db.add(log)
+    await db.delete(doc)
+    await db.commit()
+
+
+@router.delete("/keys/{key_id}", status_code=204)
+async def revoke_key(
+    key_id: str,
+    actor: dict = Depends(get_current_actor),
+    db: AsyncSession = Depends(get_db),
+):
+    key = await db.get(StorageKey, key_id)
+    if not key:
+        raise HTTPException(404, "Storage key not found")
+    await db.delete(key)
+    await db.commit()
+
+
 @router.get("/keys", response_model=list[StorageKeyOut])
 async def list_keys(
     actor: dict = Depends(get_current_actor),

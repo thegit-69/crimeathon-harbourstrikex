@@ -204,10 +204,24 @@ export default function App() {
     }));
   };
 
+  const handleDeleteKey = (keyId: string) => {
+    setRecords((prev) => ({
+      ...prev,
+      keys: prev.keys.filter((k) => k[0] !== keyId),
+    }));
+  };
+
   const handleAddDoc = (doc: DocRecord) => {
     setRecords((prev) => ({
       ...prev,
       docs: [doc, ...prev.docs],
+    }));
+  };
+
+  const handleDeleteDoc = (docName: string) => {
+    setRecords((prev) => ({
+      ...prev,
+      docs: prev.docs.filter((d) => d[0] !== docName),
     }));
   };
 
@@ -308,7 +322,9 @@ export default function App() {
                   docs={records.docs}
                   keys={records.keys}
                   onAddDoc={handleAddDoc}
+                  onDeleteDoc={handleDeleteDoc}
                   onAddKey={handleAddKey}
+                  onDeleteKey={handleDeleteKey}
                   showMessage={showMessage}
                 />
               }
