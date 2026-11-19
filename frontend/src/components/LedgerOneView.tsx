@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { InvoiceRecord, VendorRecord } from '../types';
 import { APPS } from '../data/mockData';
 import { FORENSIC_API_LOGS } from '../data/caseEvidenceData';
+import {
+  ledgeroneApi,
+  converters,
+  type BankDetailChangeDto,
+  type ScheduledPaymentDto,
+} from '../services/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -27,6 +33,8 @@ import {
   Terminal,
   ShieldAlert,
   Plus,
+  Download,
+  RefreshCw,
 } from 'lucide-react';
 
 interface LedgerOneViewProps {
@@ -45,6 +53,24 @@ export function LedgerOneView({
   showMessage,
 }: LedgerOneViewProps) {
   const [activeTab, setActiveTab] = useState('vendors');
+
+  // Live state synchronized with backend
+  const [liveVendors, setLiveVendors] = useState<VendorRecord[]>(vendors);
+  const [liveInvoices, setLiveInvoices] = useState<InvoiceRecord[]>(invoices);
+  const [livePayments, setLivePayments] = useState<ScheduledPaymentDto[]>([]);
+  const [liveChanges, setLiveChanges] = useState<BankDetailChangeDto[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUpdatingBank, setIsUpdatingBank] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Export vendor directory modal
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportData, setExportData] = useState<{
+    export_id: string;
+    request_id: string;
+    records: number;
+    data: Array<{ id: string; name: string; bank_account: string }>;
+  } | null>(null);
 
   // Register vendor modal
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -69,33 +95,192 @@ export function LedgerOneView({
   const [schedAmount, setSchedAmount] = useState('₹2,48,000');
   const [schedDate, setSchedDate] = useState('2026-09-08');
 
-  const handleRegisterVendor = (e: React.FormEvent) => {
+  // Load live data from FastAPI Backend
+  const loadLedgerData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [vRes, iRes, pRes, cRes] = await Promise.allSettled([
+        ledgeroneApi.getVendors(),
+        ledgeroneApi.getInvoices(),
+        ledgeroneApi.getScheduledPayments(),
+        ledgeroneApi.getChangeHistory(),
+      ]);
+
+      if (vRes.status === 'fulfilled' && vRes.value.length > 0) {
+        setLiveVendors(vRes.value.map(converters.vendorToRecord));
+      }
+      if (iRes.status === 'fulfilled' && iRes.value.length > 0) {
+        setLiveInvoices(iRes.value.map(converters.invoiceToRecord));
+      }
+      if (pRes.status === 'fulfilled') {
+        setLivePayments(pRes.value);
+      }
+      if (cRes.status === 'fulfilled') {
+        setLiveChanges(cRes.value);
+      }
+    } catch {
+      // offline fallback keeps local state
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled([
+      ledgeroneApi.getVendors(),
+      ledgeroneApi.getInvoices(),
+      ledgeroneApi.getScheduledPayments(),
+      ledgeroneApi.getChangeHistory(),
+    ]).then(([vRes, iRes, pRes, cRes]) => {
+      if (!active) return;
+      if (vRes.status === 'fulfilled' && vRes.value.length > 0) {
+        setLiveVendors(vRes.value.map(converters.vendorToRecord));
+      }
+      if (iRes.status === 'fulfilled' && iRes.value.length > 0) {
+        setLiveInvoices(iRes.value.map(converters.invoiceToRecord));
+      }
+      if (pRes.status === 'fulfilled') {
+        setLivePayments(pRes.value);
+      }
+      if (cRes.status === 'fulfilled') {
+        setLiveChanges(cRes.value);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleRegisterVendor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vendorId.trim() || !vendorName.trim()) {
       showMessage('Vendor ID and name are required.');
       return;
     }
-    onAddVendor([
+    const newRecord: VendorRecord = [
       vendorId.trim(),
       vendorName.trim(),
       bankAccount.trim() || '•••• 0000',
       'Active',
       'Pending review',
-    ]);
+    ];
+
+    try {
+      const created = await ledgeroneApi.createVendor({
+        id: vendorId.trim(),
+        name: vendorName.trim(),
+        bank_account: bankAccount.trim() || '•••• 0000',
+      });
+      const rec = converters.vendorToRecord(created);
+      onAddVendor(rec);
+      setLiveVendors((prev) => [rec, ...prev]);
+      showMessage(`Vendor ${vendorId.trim()} saved to database via API.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      onAddVendor(newRecord);
+      setLiveVendors((prev) => [newRecord, ...prev]);
+      showMessage(`Vendor saved locally (API note: ${msg}).`);
+    }
+
     setIsRegisterOpen(false);
     setVendorId('');
     setVendorName('');
     setBankAccount('•••• 0000');
-    showMessage('Vendor registered in system.');
   };
 
-  const handleAddInvoice = (e: React.FormEvent) => {
+  const handleAddInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = invoiceId.trim() || `INV-${Math.floor(9090 + Math.random() * 50)}`;
-    onAddInvoice([id, invoiceVendor, invoiceAmount, invoiceDue, 'Awaiting approval']);
+    const newRecord: InvoiceRecord = [id, invoiceVendor, invoiceAmount, invoiceDue, 'Awaiting approval'];
+
+    try {
+      const cleanAmount = invoiceAmount.replace(/[^0-9]/g, '') || '120000';
+      const created = await ledgeroneApi.createInvoice({
+        id,
+        vendor: invoiceVendor,
+        amount: cleanAmount,
+        due_date: invoiceDue,
+      });
+      const rec = converters.invoiceToRecord(created);
+      onAddInvoice(rec);
+      setLiveInvoices((prev) => [rec, ...prev]);
+      showMessage(`Invoice ${id} registered via API.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      onAddInvoice(newRecord);
+      setLiveInvoices((prev) => [newRecord, ...prev]);
+      showMessage(`Invoice ${id} added locally (API note: ${msg}).`);
+    }
+
     setIsAddInvoiceOpen(false);
     setInvoiceId('');
-    showMessage('Invoice added to register.');
+  };
+
+  const handleUpdateBankDetails = async () => {
+    if (!updateVendorId.trim() || !updateAccount.trim()) {
+      showMessage('Vendor ID and bank account are required.');
+      return;
+    }
+    setIsUpdatingBank(true);
+    try {
+      const res = await ledgeroneApi.patchBankDetails(updateVendorId.trim(), {
+        new_account: updateAccount.trim(),
+        approval_ref: updateApprovalRef.trim() || null,
+        actor: 'm.sundar',
+      });
+      // Update vendor in liveVendors table
+      setLiveVendors((prev) =>
+        prev.map((v) =>
+          v[0] === updateVendorId.trim()
+            ? [v[0], v[1], res.new_account, 'Active', updateApprovalRef.trim() ? 'Approved' : 'Unauthorized Tamper']
+            : v
+        )
+      );
+      showMessage(
+        `Bank routing for ${updateVendorId} updated via API (Change Ref: ${res.change_id}).`
+      );
+      // Reload change history
+      const chg = await ledgeroneApi.getChangeHistory();
+      setLiveChanges(chg);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showMessage(`Bank detail update failed: ${msg}`);
+    } finally {
+      setIsUpdatingBank(false);
+    }
+  };
+
+  const handleExportVendors = async () => {
+    setIsExporting(true);
+    try {
+      const exp = await ledgeroneApi.exportVendors();
+      setExportData(exp);
+      setIsExportModalOpen(true);
+      showMessage(`Reconnaissance Export complete: ${exp.records} vendor records retrieved.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showMessage(`Vendor export failed: ${msg}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleSchedulePayment = async () => {
+    try {
+      const cleanAmount = schedAmount.replace(/[^0-9]/g, '') || '248000';
+      const pay = await ledgeroneApi.schedulePayment({
+        vendor_id: updateVendorId || 'V-0412',
+        vendor: schedVendor,
+        amount: cleanAmount,
+        pay_date: schedDate,
+      });
+      setLivePayments((prev) => [pay, ...prev]);
+      showMessage(`Disbursement scheduled via API for ${schedVendor} (${schedAmount}).`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showMessage(`Scheduled batch recorded locally (${msg}).`);
+    }
   };
 
   return (
@@ -115,6 +300,17 @@ export function LedgerOneView({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadLedgerData}
+            disabled={isLoading}
+            className="text-xs border-slate-300"
+            title="Refresh database records"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Sync DB
+          </Button>
           <Badge variant="risk" className="text-xs">
             ● Logging Clock: UTC (90-day retention)
           </Badge>
@@ -146,16 +342,28 @@ export function LedgerOneView({
                   Vendor Master Directory & Routing Numbers
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Freight hauliers, packaging suppliers, and fuel contractors.
+                  Freight hauliers, packaging suppliers, and fuel contractors connected to PostgreSQL.
                 </CardDescription>
               </div>
-              <Button
-                size="sm"
-                onClick={() => setIsRegisterOpen(true)}
-                className="bg-slate-900 hover:bg-slate-800 text-white text-xs shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" /> Register vendor
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportVendors}
+                  disabled={isExporting}
+                  className="border-slate-300 text-xs shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5 mr-1" />
+                  {isExporting ? 'Exporting...' : 'Export Directory'}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsRegisterOpen(true)}
+                  className="bg-slate-900 hover:bg-slate-800 text-white text-xs shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Register vendor
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -170,7 +378,7 @@ export function LedgerOneView({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vendors.map((v, i) => (
+                  {liveVendors.map((v, i) => (
                     <TableRow
                       key={i}
                       className={v[0] === 'V-0412' ? 'bg-rose-100/70 font-semibold' : undefined}
@@ -257,7 +465,7 @@ export function LedgerOneView({
                 </Alert>
 
                 <div className="space-y-2">
-                  {vendors.map((v, i) => (
+                  {liveVendors.map((v, i) => (
                     <div
                       key={i}
                       className={`flex items-center justify-between p-3 rounded-lg border ${
@@ -290,7 +498,7 @@ export function LedgerOneView({
                   Dual-Approved Bank Detail Remediation
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Restore genuine bank routing with formal Finance Manager authorization.
+                  Restore genuine bank routing with formal Finance Manager authorization via API.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-0 space-y-4">
@@ -321,12 +529,11 @@ export function LedgerOneView({
                   />
                 </div>
                 <Button
-                  onClick={() => {
-                    showMessage(`Bank routing for ${updateVendorId} restored with approval ref ${updateApprovalRef}.`);
-                  }}
+                  onClick={handleUpdateBankDetails}
+                  disabled={isUpdatingBank}
                   className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
                 >
-                  Submit Dual-Approved Restoration
+                  {isUpdatingBank ? 'Submitting to API...' : 'Submit Dual-Approved Restoration'}
                 </Button>
               </CardContent>
             </Card>
@@ -365,7 +572,7 @@ export function LedgerOneView({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {invoices.map((inv, i) => (
+                  {liveInvoices.map((inv, i) => (
                     <TableRow
                       key={i}
                       className={inv[0] === 'INV-9081' ? 'bg-rose-100/70 font-semibold' : undefined}
@@ -407,7 +614,7 @@ export function LedgerOneView({
                   Upcoming September 8th Payment Disbursement Run
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Vendor disbursements executed twice monthly (8th and 23rd). 15 scheduled batches prepared.
+                  Vendor disbursements executed twice monthly (8th and 23rd). Live batches from database.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-0 space-y-3">
@@ -419,39 +626,53 @@ export function LedgerOneView({
                 </Alert>
 
                 <div className="space-y-2">
-                  <div className="p-3 rounded-lg border border-rose-300 bg-rose-50/80 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-rose-950">08 Sep · Coastal Packaging Ltd (V-0412)</div>
-                      <div className="text-[11px] text-rose-900 font-mono mt-0.5">
-                        Amount: <strong>₹2,48,000</strong> · Destination: <code>•••• 9083</code> (Hijacked Beneficiary)
+                  {/* Dynamic or fallback payment items */}
+                  {livePayments.length > 0 ? (
+                    livePayments.map((pay) => (
+                      <div
+                        key={pay.id}
+                        className={`p-3 rounded-lg border flex items-center justify-between ${
+                          pay.vendor.includes('Coastal')
+                            ? 'border-rose-300 bg-rose-50/80'
+                            : 'border-slate-200 bg-slate-50/50'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">
+                            {pay.pay_date} · {pay.vendor}
+                          </div>
+                          <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                            Batch: {pay.id} · Amount: <strong>₹{pay.amount}</strong>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={pay.vendor.includes('Coastal') ? 'risk' : 'ok'}
+                          className="text-[10px]"
+                        >
+                          {pay.vendor.includes('Coastal') ? 'PAYOUT ARMED' : pay.status}
+                        </Badge>
                       </div>
-                    </div>
-                    <Badge variant="risk" className="text-[10px]">PAYOUT ARMED</Badge>
-                  </div>
-
-                  <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-slate-900">08 Sep · Southern Haulage Corp (V-0104)</div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">Amount: ₹5,40,000 · Destination: •••• 3319</div>
-                    </div>
-                    <Badge variant="ok" className="text-[10px]">Scheduled</Badge>
-                  </div>
-
-                  <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-slate-900">08 Sep · Deccan Container Lines (V-0182)</div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">Amount: ₹3,15,000 · Destination: •••• 6542</div>
-                    </div>
-                    <Badge variant="ok" className="text-[10px]">Scheduled</Badge>
-                  </div>
-
-                  <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-slate-900">08 Sep · Northstar Freight Co. (V-0388)</div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">Amount: ₹86,500 · Destination: •••• 4417</div>
-                    </div>
-                    <Badge variant="ok" className="text-[10px]">Scheduled</Badge>
-                  </div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="p-3 rounded-lg border border-rose-300 bg-rose-50/80 flex items-center justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-rose-950">08 Sep · Coastal Packaging Ltd (V-0412)</div>
+                          <div className="text-[11px] text-rose-900 font-mono mt-0.5">
+                            Amount: <strong>₹2,48,000</strong> · Destination: <code>•••• 9083</code> (Hijacked Beneficiary)
+                          </div>
+                        </div>
+                        <Badge variant="risk" className="text-[10px]">PAYOUT ARMED</Badge>
+                      </div>
+                      <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 flex items-center justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">08 Sep · Southern Haulage Corp (V-0104)</div>
+                          <div className="text-[11px] text-slate-500 font-mono mt-0.5">Amount: ₹5,40,000 · Destination: •••• 3319</div>
+                        </div>
+                        <Badge variant="ok" className="text-[10px]">Scheduled</Badge>
+                      </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -462,7 +683,7 @@ export function LedgerOneView({
                   Queue Emergency Disbursement Run
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Prepare out-of-cycle payments or freeze current batches.
+                  Prepare out-of-cycle payments or submit scheduled payment batches via API.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-4 pt-0 space-y-4">
@@ -492,7 +713,7 @@ export function LedgerOneView({
                   />
                 </div>
                 <Button
-                  onClick={() => showMessage('Payment schedule updated in demo.')}
+                  onClick={handleSchedulePayment}
                   className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
                 >
                   Confirm Scheduled Batch
@@ -560,62 +781,90 @@ export function LedgerOneView({
                   Vendor Master Change Log (E19)
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Analysis of 367 change records. Row 311 represents the ONLY bank modification via API in company history.
+                  Connected to PostgreSQL audit log table. Row 311 represents the fraudulent modification.
                 </CardDescription>
               </div>
               <Badge variant="risk" className="text-xs shrink-0">
-                Row 311: Fraudulent Bank Modification
+                Live Audit Logs Loaded: {liveChanges.length}
               </Badge>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[170px]">Timestamp (UTC)</TableHead>
-                    <TableHead className="w-[130px]">Change ID</TableHead>
+                    <TableHead className="w-[170px]">Change ID</TableHead>
+                    <TableHead className="w-[120px]">Vendor</TableHead>
                     <TableHead className="w-[140px]">Changed By</TableHead>
                     <TableHead className="w-[100px]">Channel</TableHead>
-                    <TableHead className="w-[150px]">Vendor</TableHead>
-                    <TableHead className="w-[130px]">Field</TableHead>
-                    <TableHead>Old → New Value</TableHead>
-                    <TableHead className="w-[130px]">Approval Ref</TableHead>
-                    <TableHead className="w-[120px]">Source IP</TableHead>
+                    <TableHead>Old → New Account</TableHead>
+                    <TableHead className="w-[150px]">Approval Ref</TableHead>
+                    <TableHead className="w-[140px]">Request ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow className="bg-rose-100/80 font-bold">
-                    <TableCell className="font-mono text-xs text-rose-950">2026-09-03 01:44:30</TableCell>
-                    <TableCell className="font-mono text-xs text-rose-950">chg-8b9888c39b</TableCell>
-                    <TableCell><code className="text-xs text-rose-950 font-bold">key-tb-07</code></TableCell>
-                    <TableCell><Badge variant="risk" className="text-[10px]">API</Badge></TableCell>
-                    <TableCell className="text-xs text-rose-950">V-0412 (Coastal)</TableCell>
-                    <TableCell className="font-mono text-xs">bank_account</TableCell>
-                    <TableCell className="font-mono text-xs text-rose-950">••••4417 → ••••9083</TableCell>
-                    <TableCell><Badge variant="risk" className="text-[10px]">BLANK (NaN)</Badge></TableCell>
-                    <TableCell className="font-mono text-xs text-rose-950">10.20.4.77</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-xs">2026-08-31 16:20:00</TableCell>
-                    <TableCell className="font-mono text-xs">chg-8b9888a101</TableCell>
-                    <TableCell><code className="text-xs">f.dsouza</code></TableCell>
-                    <TableCell><Badge variant="ok" className="text-[10px]">UI</Badge></TableCell>
-                    <TableCell className="text-xs">V-0388 (Northstar)</TableCell>
-                    <TableCell className="font-mono text-xs">address</TableCell>
-                    <TableCell className="text-xs">Coimbatore Depot Updated</TableCell>
-                    <TableCell className="font-mono text-xs">APR-1257</TableCell>
-                    <TableCell className="font-mono text-xs">172.16.8.31</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-xs">2026-07-31 18:30:00</TableCell>
-                    <TableCell className="font-mono text-xs">chg-8b98889984</TableCell>
-                    <TableCell><code className="text-xs">f.dsouza</code></TableCell>
-                    <TableCell><Badge variant="ok" className="text-[10px]">IMPORT</Badge></TableCell>
-                    <TableCell className="text-xs">12 Vendors Bulk</TableCell>
-                    <TableCell className="font-mono text-xs">bank_account</TableCell>
-                    <TableCell className="text-xs">Month-end cleanup validation</TableCell>
-                    <TableCell className="font-mono text-xs">BULK-0731</TableCell>
-                    <TableCell className="font-mono text-xs">172.16.8.31</TableCell>
-                  </TableRow>
+                  {/* Dynamic changes from backend */}
+                  {liveChanges.map((chg) => (
+                    <TableRow
+                      key={chg.id}
+                      className={
+                        chg.vendor_id === 'V-0412' && !chg.approval_ref
+                          ? 'bg-rose-100/80 font-bold'
+                          : undefined
+                      }
+                    >
+                      <TableCell className="font-mono text-xs font-bold">{chg.id}</TableCell>
+                      <TableCell className="text-xs font-bold">{chg.vendor_id}</TableCell>
+                      <TableCell>
+                        <code className="text-xs">{chg.actor || 'anonymous'}</code>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={chg.actor?.includes('key') ? 'risk' : 'ok'}
+                          className="text-[10px]"
+                        >
+                          {chg.actor?.includes('key') ? 'API' : 'UI'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {chg.old_account || '•••• 4417'} → <strong className="text-rose-950">{chg.new_account}</strong>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={chg.approval_ref ? 'ok' : 'risk'}
+                          className="text-[10px]"
+                        >
+                          {chg.approval_ref || 'BLANK (NaN)'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-slate-500">
+                        {chg.request_id || 'req-api'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+
+                  {/* Fallback Historical Seed Rows */}
+                  {liveChanges.length === 0 && (
+                    <>
+                      <TableRow className="bg-rose-100/80 font-bold">
+                        <TableCell className="font-mono text-xs text-rose-950">chg-8b9888c39b</TableCell>
+                        <TableCell className="text-xs text-rose-950">V-0412</TableCell>
+                        <TableCell><code className="text-xs text-rose-950 font-bold">key-tb-07</code></TableCell>
+                        <TableCell><Badge variant="risk" className="text-[10px]">API</Badge></TableCell>
+                        <TableCell className="font-mono text-xs text-rose-950">••••4417 → ••••9083</TableCell>
+                        <TableCell><Badge variant="risk" className="text-[10px]">BLANK (NaN)</Badge></TableCell>
+                        <TableCell className="font-mono text-xs text-rose-950">req-5f61b0de8</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono text-xs">chg-8b9888a101</TableCell>
+                        <TableCell className="text-xs">V-0388</TableCell>
+                        <TableCell><code className="text-xs">f.dsouza</code></TableCell>
+                        <TableCell><Badge variant="ok" className="text-[10px]">UI</Badge></TableCell>
+                        <TableCell className="text-xs">Coimbatore Depot Updated</TableCell>
+                        <TableCell className="font-mono text-xs">APR-1257</TableCell>
+                        <TableCell className="font-mono text-xs">172.16.8.31</TableCell>
+                      </TableRow>
+                    </>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -774,6 +1023,29 @@ export function LedgerOneView({
             Create Invoice
           </Button>
         </form>
+      </Dialog>
+
+      {/* Vendor Export Result Dialog */}
+      <Dialog
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Reconnaissance Export Output (GET /api/v2/vendors/export)"
+        description={`Export Ref: ${exportData?.export_id || 'exp-01'} · Total Records: ${exportData?.records || 0}`}
+      >
+        <div className="space-y-3">
+          <div className="text-xs text-slate-600">
+            This API endpoint was invoked by the adversary during reconnaissance to extract all active vendor IDs and routing numbers.
+          </div>
+          <div className="max-h-60 overflow-y-auto rounded bg-slate-900 p-3 font-mono text-xs text-emerald-400">
+            <pre>{JSON.stringify(exportData, null, 2)}</pre>
+          </div>
+          <Button
+            onClick={() => setIsExportModalOpen(false)}
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold"
+          >
+            Close Output
+          </Button>
+        </div>
       </Dialog>
     </div>
   );

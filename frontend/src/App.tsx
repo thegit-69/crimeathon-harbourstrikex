@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import './styles/harborstrike.css';
 import type { AppTheme, RecordsData, TicketRecord, VendorRecord, KeyRecord, DocRecord, InvoiceRecord, SyncJobRecord } from './types';
 import { INITIAL_RECORDS } from './data/mockData';
+import { checkBackendHealth, removeToken } from './services/api';
 import { Auth } from './components/Auth';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -50,6 +51,56 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTimer, setToastTimer] = useState<number | null>(null);
+  const [backendConnected, setBackendConnected] = useState<boolean | null>(null);
+
+  const probeHealth = useCallback(async () => {
+    try {
+      const isUp = await checkBackendHealth();
+      setBackendConnected(isUp);
+      return isUp;
+    } catch {
+      setBackendConnected(false);
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    checkBackendHealth()
+      .then((isUp) => {
+        if (active) setBackendConnected(isUp);
+      })
+      .catch(() => {
+        if (active) setBackendConnected(false);
+      });
+
+    const interval = setInterval(() => {
+      checkBackendHealth()
+        .then((isUp) => {
+          if (active) setBackendConnected(isUp);
+        })
+        .catch(() => {
+          if (active) setBackendConnected(false);
+        });
+    }, 15000);
+
+    const onFocus = () => {
+      checkBackendHealth()
+        .then((isUp) => {
+          if (active) setBackendConnected(isUp);
+        })
+        .catch(() => {
+          if (active) setBackendConnected(false);
+        });
+    };
+
+    window.addEventListener('focus', onFocus);
+    return () => {
+      active = false;
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   const [records, setRecords] = useState<RecordsData>(() => {
     try {
@@ -104,6 +155,7 @@ export default function App() {
   const handleLogout = () => {
     try {
       localStorage.removeItem('hsCurrentUser');
+      removeToken();
     } catch {
       // ignore
     }
@@ -129,6 +181,13 @@ export default function App() {
       }
       return { ...prev, tickets: updated };
     });
+  };
+
+  const handleDeleteTicket = (ticketId: string) => {
+    setRecords((prev) => ({
+      ...prev,
+      tickets: prev.tickets.filter((t) => t[0] !== ticketId),
+    }));
   };
 
   const handleAddVendor = (vendor: VendorRecord) => {
@@ -173,7 +232,12 @@ export default function App() {
     }
     return (
       <>
-        <Auth onSignIn={handleSignIn} showMessage={showMessage} />
+        <Auth
+          onSignIn={handleSignIn}
+          showMessage={showMessage}
+          backendConnected={backendConnected}
+          onCheckHealth={probeHealth}
+        />
         <Toast message={toastMessage} />
       </>
     );
@@ -208,6 +272,8 @@ export default function App() {
         username={user}
         onLogout={handleLogout}
         onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+        backendConnected={backendConnected}
+        onCheckHealth={probeHealth}
       />
 
       <main>
@@ -229,6 +295,7 @@ export default function App() {
                   tickets={records.tickets}
                   onAddTicket={handleAddTicket}
                   onUpdateTicketStatus={handleUpdateTicketStatus}
+                  onDeleteTicket={handleDeleteTicket}
                   showMessage={showMessage}
                 />
               }

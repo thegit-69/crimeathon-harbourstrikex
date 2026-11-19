@@ -65,6 +65,27 @@ async def update_ticket_status(
     return ticket
 
 
+@router.delete("/tickets/{ticket_id}", status_code=204)
+async def delete_ticket(
+    ticket_id: str,
+    actor: dict = Depends(get_current_actor),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await db.get(Ticket, ticket_id)
+    if not ticket:
+        raise HTTPException(404, "Ticket not found")
+    audit = HelpDeskAuditLog(
+        id=f"evt-{uuid.uuid4().hex[:10]}",
+        actor=actor["actor"],
+        event="ticket.delete",
+        object_ref=ticket_id,
+        result="Success",
+    )
+    db.add(audit)
+    await db.delete(ticket)
+    await db.commit()
+
+
 @router.get("/exports", response_model=list[ExportJobOut])
 async def list_exports(
     actor: dict = Depends(get_current_actor),

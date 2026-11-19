@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PageId } from '../types';
 import { APPS } from '../data/mockData';
@@ -8,6 +8,13 @@ import {
   OFFENSIVE_KILLCHAIN_PHASES,
   ATTACK_FOOTPRINT_VERIFICATION,
 } from '../data/caseEvidenceData';
+import {
+  dashboardApi,
+  ledgeroneApi,
+  type DashboardStats,
+  type DashboardActivity,
+  type SystemStatusItem,
+} from '../services/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -25,6 +32,8 @@ import {
   Crosshair,
   Play,
   RotateCcw,
+  Server,
+  Activity,
 } from 'lucide-react';
 
 interface DashboardViewProps {
@@ -35,6 +44,12 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   const navigate = useNavigate();
   const [selectedVectorIndex, setSelectedVectorIndex] = useState(0);
   const [simulatedExecutionState, setSimulatedExecutionState] = useState<'idle' | 'running' | 'success'>('idle');
+  const [executionMessage, setExecutionMessage] = useState<string | null>(null);
+
+  // Live Backend Telemetry State
+  const [liveStats, setLiveStats] = useState<DashboardStats | null>(null);
+  const [liveStatus, setLiveStatus] = useState<SystemStatusItem[]>([]);
+  const [liveActivity, setLiveActivity] = useState<DashboardActivity[]>([]);
 
   const routeMap: Record<Exclude<PageId, 'dashboard'>, string> = {
     help: '/helpdeskr',
@@ -51,13 +66,61 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     navigate(routeMap[appId]);
   };
 
+  useEffect(() => {
+    let isMounted = true;
+    const fetchDashboardData = async () => {
+      try {
+        const [s, st, a] = await Promise.allSettled([
+          dashboardApi.getStats(),
+          dashboardApi.getStatus(),
+          dashboardApi.getActivity(),
+        ]);
+        if (isMounted) {
+          if (s.status === 'fulfilled') setLiveStats(s.value);
+          if (st.status === 'fulfilled') setLiveStatus(st.value);
+          if (a.status === 'fulfilled') setLiveActivity(a.value);
+        }
+      } catch {
+        // Fallback silently
+      }
+    };
+    fetchDashboardData();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const currentVector = OFFENSIVE_ATTACK_VECTORS[selectedVectorIndex] || OFFENSIVE_ATTACK_VECTORS[0];
 
-  const handleRunSimulatedExploit = () => {
+  const handleRunSimulatedExploit = async () => {
     setSimulatedExecutionState('running');
-    setTimeout(() => {
+    setExecutionMessage(null);
+    try {
+      if (selectedVectorIndex === 0) {
+        // Real API invocation against LedgerOne bank-details endpoint
+        const res = await ledgeroneApi.patchBankDetails('V-0412', {
+          new_account: '98765432109083',
+          actor: 'key-tb-07',
+          caller_ip: '10.20.4.77',
+          approval_ref: null,
+        });
+        setExecutionMessage(
+          `Live Exploit Executed via API: Patched V-0412 bank account to ${res.new_account}. Change Ref: ${res.change_id}. Blank approval reference accepted!`
+        );
+      } else {
+        // Simulated execution for other vectors
+        setTimeout(() => {
+          setExecutionMessage(
+            `Simulated Payload Delivered: Target endpoint responded with 200 OK. Footprint record ${currentVector.footprintRecordId} logged.`
+          );
+        }, 400);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setExecutionMessage(`Exploit simulation complete. Note: ${msg}`);
+    } finally {
       setSimulatedExecutionState('success');
-    }, 600);
+    }
   };
 
   const stats = [
@@ -122,6 +185,41 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
         </div>
       </div>
 
+      {/* Live Target Systems Health Telemetry */}
+      {liveStatus.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 p-2.5 bg-slate-100 rounded-lg border border-slate-200 text-xs">
+          <span className="font-bold text-slate-600 uppercase tracking-wider text-[10px] flex items-center gap-1.5 mr-2">
+            <Server className="w-3.5 h-3.5 text-slate-700" />
+            LIVE SYSTEM TELEMETRY:
+          </span>
+          {liveStatus.map((item) => (
+            <div
+              key={item.name}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-white rounded border border-slate-200 shadow-xs"
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  item.badge === 'ok'
+                    ? 'bg-emerald-500'
+                    : item.badge === 'warn'
+                    ? 'bg-amber-500'
+                    : 'bg-rose-500'
+                }`}
+              />
+              <span className="font-semibold text-slate-800">{item.name}</span>
+              <span className="text-[10px] text-slate-500 font-mono">({item.status})</span>
+            </div>
+          ))}
+          {liveStats && (
+            <div className="ml-auto text-[11px] font-mono text-slate-600 flex items-center gap-3">
+              <span>Vendors: <strong>{liveStats.active_vendors}/{liveStats.total_vendors}</strong></span>
+              <span>Vault Docs: <strong>{liveStats.stored_documents}</strong></span>
+              <span>Open Tickets: <strong>{liveStats.open_tickets}</strong></span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Primary Offensive Target Banner */}
       <Alert className="border-rose-400/80 bg-gradient-to-r from-rose-950 to-slate-900 text-white shadow-md">
         <Flame className="h-6 w-6 text-rose-400 shrink-0 mt-0.5" />
@@ -162,7 +260,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
         </div>
       </Alert>
 
-      {/* KPI Stats Grid with shadcn Cards */}
+      {/* KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s, idx) => {
           const IconComponent = s.icon;
@@ -223,7 +321,10 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setSimulatedExecutionState('idle')}
+                  onClick={() => {
+                    setSimulatedExecutionState('idle');
+                    setExecutionMessage(null);
+                  }}
                   className="border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs"
                 >
                   <RotateCcw className="w-3 h-3" />
@@ -241,6 +342,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                 onClick={() => {
                   setSelectedVectorIndex(idx);
                   setSimulatedExecutionState('idle');
+                  setExecutionMessage(null);
                 }}
                 className={`text-xs font-mono px-3 py-1.5 rounded-md transition-all flex items-center gap-2 ${
                   selectedVectorIndex === idx
@@ -323,7 +425,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                 <div className="p-2.5 bg-emerald-950/70 border border-emerald-700/60 rounded text-emerald-300 text-xs flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>
-                    Exploit executed successfully. Trace verified in target audit log with zero alarm raised.
+                    {executionMessage || 'Exploit executed successfully. Trace verified in target audit log with zero alarm raised.'}
                   </span>
                 </div>
               )}
@@ -370,6 +472,49 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
           ))}
         </div>
       </div>
+
+      {/* Live System Activity Feed from Backend */}
+      {liveActivity.length > 0 && (
+        <Card className="border-slate-200">
+          <CardHeader className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-indigo-600" />
+                  Live API Audit Activity Feed
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Real-time events streamed from connected database tables across business systems.
+                </CardDescription>
+              </div>
+              <Badge variant="ok" className="text-[10px] font-mono">
+                {liveActivity.length} Events Logged
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {liveActivity.map((act, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-2.5 rounded bg-slate-50 border border-slate-100 text-xs"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-mono text-[10px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded">
+                      {act.app}
+                    </span>
+                    <span className="text-slate-800 font-medium">{act.desc}</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-slate-500 font-mono text-[10px]">
+                    {act.actor && <span className="text-slate-700 bg-slate-200 px-1 rounded">{act.actor}</span>}
+                    {act.ts && <span>{new Date(act.ts).toLocaleTimeString()}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Attack Kill Chain & Footprint Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -4,9 +4,17 @@ interface SidebarProps {
   username: string;
   onLogout: () => void;
   onToggleSidebar: () => void;
+  backendConnected?: boolean | null;
+  onCheckHealth?: () => void;
 }
 
-export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
+export function Sidebar({
+  username,
+  onLogout,
+  onToggleSidebar,
+  backendConnected,
+  onCheckHealth,
+}: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -90,6 +98,94 @@ export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
       </nav>
 
       <div className="bottom">
+        {/* Backend Connection Status */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '7px 10px',
+            marginBottom: '12px',
+            borderRadius: '7px',
+            fontSize: '11px',
+            fontWeight: 700,
+            background:
+              backendConnected === true
+                ? 'rgba(34, 197, 94, 0.12)'
+                : backendConnected === false
+                ? 'rgba(239, 68, 68, 0.12)'
+                : 'rgba(148, 163, 184, 0.12)',
+            color:
+              backendConnected === true
+                ? '#15803d'
+                : backendConnected === false
+                ? '#b91c1c'
+                : '#64748b',
+            border: `1px solid ${
+              backendConnected === true
+                ? 'rgba(34, 197, 94, 0.3)'
+                : backendConnected === false
+                ? 'rgba(239, 68, 68, 0.3)'
+                : 'rgba(148, 163, 184, 0.25)'
+            }`,
+          }}
+          title={
+            backendConnected === true
+              ? 'FastAPI Backend connected (http://localhost:8000)'
+              : backendConnected === false
+              ? 'Backend disconnected. Running in offline/fallback mode.'
+              : 'Probing backend status...'
+          }
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <span
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor:
+                  backendConnected === true
+                    ? '#22c55e'
+                    : backendConnected === false
+                    ? '#ef4444'
+                    : '#94a3b8',
+                display: 'inline-block',
+                boxShadow:
+                  backendConnected === true
+                    ? '0 0 6px #22c55e'
+                    : backendConnected === false
+                    ? '0 0 6px #ef4444'
+                    : 'none',
+              }}
+            />
+            <span>
+              {backendConnected === true
+                ? 'API Connected'
+                : backendConnected === false
+                ? 'Backend Disconnected'
+                : 'Checking API...'}
+            </span>
+          </div>
+          {onCheckHealth && (
+            <button
+              type="button"
+              onClick={onCheckHealth}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '0 2px',
+                fontSize: '12px',
+                color: 'inherit',
+                opacity: 0.8,
+              }}
+              title="Refresh connection status"
+            >
+              ↻
+            </button>
+          )}
+        </div>
+
         <p className="small">LOGGED IN AS</p>
         <b id="uname">{username || 'demo_operator'}</b>
         <button type="button" className="btn ghost full" onClick={onLogout}>
