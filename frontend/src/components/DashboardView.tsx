@@ -1,11 +1,28 @@
+import { useNavigate } from 'react-router-dom';
 import type { PageId } from '../types';
 import { APPS } from '../data/mockData';
 
 interface DashboardViewProps {
-  onNavigate: (page: PageId) => void;
+  onNavigate?: (page: PageId) => void;
 }
 
 export function DashboardView({ onNavigate }: DashboardViewProps) {
+  const navigate = useNavigate();
+
+  const routeMap: Record<Exclude<PageId, 'dashboard'>, string> = {
+    help: '/HelpDeskr',
+    blue: '/BlueVault',
+    ledger: '/LedgerOne',
+    tally: '/TallyBridge',
+  };
+
+  const handleModuleClick = (appId: Exclude<PageId, 'dashboard'>) => {
+    if (onNavigate) {
+      onNavigate(appId);
+    }
+    navigate(routeMap[appId]);
+  };
+
   const stats = [
     { label: 'Open support tickets', value: '12', sub: 'Customer and employee queues' },
     { label: 'Stored documents', value: '1,284', sub: 'Finance and operational folders' },
@@ -54,7 +71,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
           <div
             key={app.id}
             className="panel module"
-            onClick={() => onNavigate(app.id)}
+            onClick={() => handleModuleClick(app.id as Exclude<PageId, 'dashboard'>)}
           >
             <div className="ico">{app.icon}</div>
             <div>

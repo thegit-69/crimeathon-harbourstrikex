@@ -1,16 +1,30 @@
-import type { PageId } from '../types';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
-  currentPage: PageId;
-  onNavigate: (page: PageId) => void;
   username: string;
   onLogout: () => void;
+  onToggleSidebar: () => void;
 }
 
-export function Sidebar({ currentPage, onNavigate, username, onLogout }: SidebarProps) {
+export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const currentPath = location.pathname.toLowerCase();
+  const isDashboard = currentPath === '/dashboard' || currentPath === '/dashbord';
+  const isHelp = currentPath === '/helpdeskr';
+  const isBlue = currentPath === '/bluevault';
+  const isLedger = currentPath === '/ledgerone';
+  const isTally = currentPath === '/tallybridge';
+
   return (
     <aside className="side" id="side">
-      <div className="logo">
+      <div
+        className="logo"
+        onClick={onToggleSidebar}
+        style={{ cursor: 'pointer' }}
+        title="Toggle sidebar"
+      >
         <span className="hs-name">HARBORSTRIKE</span>
       </div>
 
@@ -19,8 +33,8 @@ export function Sidebar({ currentPage, onNavigate, username, onLogout }: Sidebar
         <button
           type="button"
           data-page="dashboard"
-          className={currentPage === 'dashboard' ? 'active' : ''}
-          onClick={() => onNavigate('dashboard')}
+          className={isDashboard ? 'active' : ''}
+          onClick={() => navigate('/Dashboard')}
         >
           ▦ &nbsp; Dashboard
         </button>
@@ -31,32 +45,32 @@ export function Sidebar({ currentPage, onNavigate, username, onLogout }: Sidebar
         <button
           type="button"
           data-page="help"
-          className={currentPage === 'help' ? 'active' : ''}
-          onClick={() => onNavigate('help')}
+          className={isHelp ? 'active' : ''}
+          onClick={() => navigate('/HelpDeskr')}
         >
           ▤ &nbsp; HelpDeskr
         </button>
         <button
           type="button"
           data-page="blue"
-          className={currentPage === 'blue' ? 'active' : ''}
-          onClick={() => onNavigate('blue')}
+          className={isBlue ? 'active' : ''}
+          onClick={() => navigate('/BlueVault')}
         >
           ▣ &nbsp; BlueVault
         </button>
         <button
           type="button"
           data-page="ledger"
-          className={currentPage === 'ledger' ? 'active' : ''}
-          onClick={() => onNavigate('ledger')}
+          className={isLedger ? 'active' : ''}
+          onClick={() => navigate('/LedgerOne')}
         >
           ▥ &nbsp; LedgerOne
         </button>
         <button
           type="button"
           data-page="tally"
-          className={currentPage === 'tally' ? 'active' : ''}
-          onClick={() => onNavigate('tally')}
+          className={isTally ? 'active' : ''}
+          onClick={() => navigate('/TallyBridge')}
         >
           ⌘ &nbsp; TallyBridge
         </button>

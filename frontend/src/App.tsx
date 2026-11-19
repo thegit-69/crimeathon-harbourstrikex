@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import './styles/harborstrike.css';
-import type { PageId, AppTheme, RecordsData, TicketRecord, VendorRecord, KeyRecord, DocRecord, InvoiceRecord, SyncJobRecord } from './types';
-import { APPS, INITIAL_RECORDS } from './data/mockData';
+import type { AppTheme, RecordsData, TicketRecord, VendorRecord, KeyRecord, DocRecord, InvoiceRecord, SyncJobRecord } from './types';
+import { INITIAL_RECORDS } from './data/mockData';
 import { Auth } from './components/Auth';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -11,15 +12,59 @@ import { HelpDeskrView } from './components/HelpDeskrView';
 import { BlueVaultView } from './components/BlueVaultView';
 import { LedgerOneView } from './components/LedgerOneView';
 import { TallyBridgeView } from './components/TallyBridgeView';
+import { NotFoundView } from './components/NotFoundView';
+
+function getThemeFromPath(pathname: string): AppTheme {
+  const p = pathname.toLowerCase();
+  if (p === '/helpdeskr') return 'help';
+  if (p === '/bluevault') return 'blue';
+  if (p === '/ledgerone') return 'ledger';
+  if (p === '/tallybridge') return 'tally';
+  return 'overview';
+}
+
+function getCrumbFromPath(pathname: string): string {
+  const p = pathname.toLowerCase();
+  if (p === '/helpdeskr') return 'HelpDeskr';
+  if (p === '/bluevault') return 'BlueVault';
+  if (p === '/ledgerone') return 'LedgerOne';
+  if (p === '/tallybridge') return 'TallyBridge';
+  return 'Dashboard';
+}
 
 export default function App() {
-  const [user, setUser] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState<PageId>('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [user, setUser] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('hsCurrentUser');
+    } catch {
+      return null;
+    }
+  });
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTimer, setToastTimer] = useState<number | null>(null);
 
-  const [records, setRecords] = useState<RecordsData>(INITIAL_RECORDS);
+  const [records, setRecords] = useState<RecordsData>(() => {
+    try {
+      const saved = localStorage.getItem('hsRecords');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+    return INITIAL_RECORDS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hsRecords', JSON.stringify(records));
+    } catch {
+      // ignore
+    }
+  }, [records]);
 
   const showMessage = (msg: string) => {
     if (toastTimer) {
@@ -43,20 +88,25 @@ export default function App() {
   }, []);
 
   const handleSignIn = (username: string) => {
+    try {
+      localStorage.setItem('hsCurrentUser', username);
+    } catch {
+      // ignore
+    }
     setUser(username);
-    setCurrentPage('dashboard');
-    setSidebarOpen(true);
     showMessage(`Signed in as ${username}`);
+    navigate('/Dashboard');
   };
 
   const handleLogout = () => {
+    try {
+      localStorage.removeItem('hsCurrentUser');
+    } catch {
+      // ignore
+    }
     setUser(null);
-    setSidebarOpen(false);
     showMessage('Signed out.');
-  };
-
-  const handleNavigate = (page: PageId) => {
-    setCurrentPage(page);
+    navigate('/');
   };
 
   // State update handlers for entities
@@ -113,8 +163,11 @@ export default function App() {
     }));
   };
 
-  // If not logged in, show Auth
-  if (!user) {
+  // Route: /
+  if (location.pathname === '/') {
+    if (user) {
+      return <Navigate to="/Dashboard" replace />;
+    }
     return (
       <>
         <Auth onSignIn={handleSignIn} showMessage={showMessage} />
@@ -123,8 +176,13 @@ export default function App() {
     );
   }
 
-  const currentTheme: AppTheme = currentPage === 'dashboard' ? 'overview' : currentPage;
-  const crumbText = currentPage === 'dashboard' ? 'Dashboard' : APPS[currentPage].name;
+  // Protected route check: if unauthenticated, redirect to /
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  const currentTheme = getThemeFromPath(location.pathname);
+  const crumbText = getCrumbFromPath(location.pathname);
 
   return (
     <div
@@ -135,10 +193,9 @@ export default function App() {
       <div id="sideBackdrop" onClick={() => setSidebarOpen(false)} />
 
       <Sidebar
-        currentPage={currentPage}
-        onNavigate={handleNavigate}
         username={user}
         onLogout={handleLogout}
+        onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
       />
 
       <main>
@@ -148,44 +205,70 @@ export default function App() {
         />
 
         <div className="content" id="view">
-          {currentPage === 'dashboard' && (
-            <DashboardView onNavigate={handleNavigate} />
-          )}
-          {currentPage === 'help' && (
-            <HelpDeskrView
-              tickets={records.tickets}
-              onAddTicket={handleAddTicket}
-              onUpdateTicketStatus={handleUpdateTicketStatus}
-              showMessage={showMessage}
+          <Routes>
+            <Route path="/Dashboard" element={<DashboardView />} />
+            <Route path="/Dashbord" element={<Navigate to="/Dashboard" replace />} />
+            <Route path="/dashbord" element={<Navigate to="/Dashboard" replace />} />
+            <Route path="/dashboard" element={<Navigate to="/Dashboard" replace />} />
+
+            <Route
+              path="/HelpDeskr"
+              element={
+                <HelpDeskrView
+                  tickets={records.tickets}
+                  onAddTicket={handleAddTicket}
+                  onUpdateTicketStatus={handleUpdateTicketStatus}
+                  showMessage={showMessage}
+                />
+              }
             />
-          )}
-          {currentPage === 'blue' && (
-            <BlueVaultView
-              docs={records.docs}
-              keys={records.keys}
-              onAddDoc={handleAddDoc}
-              onAddKey={handleAddKey}
-              showMessage={showMessage}
+            <Route path="/helpdeskr" element={<Navigate to="/HelpDeskr" replace />} />
+
+            <Route
+              path="/BlueVault"
+              element={
+                <BlueVaultView
+                  docs={records.docs}
+                  keys={records.keys}
+                  onAddDoc={handleAddDoc}
+                  onAddKey={handleAddKey}
+                  showMessage={showMessage}
+                />
+              }
             />
-          )}
-          {currentPage === 'ledger' && (
-            <LedgerOneView
-              vendors={records.vendors}
-              invoices={records.invoices}
-              onAddVendor={handleAddVendor}
-              onAddInvoice={handleAddInvoice}
-              showMessage={showMessage}
+            <Route path="/bluevault" element={<Navigate to="/BlueVault" replace />} />
+
+            <Route
+              path="/LedgerOne"
+              element={
+                <LedgerOneView
+                  vendors={records.vendors}
+                  invoices={records.invoices}
+                  onAddVendor={handleAddVendor}
+                  onAddInvoice={handleAddInvoice}
+                  showMessage={showMessage}
+                />
+              }
             />
-          )}
-          {currentPage === 'tally' && (
-            <TallyBridgeView
-              keys={records.keys}
-              jobs={records.jobs}
-              onAddKey={handleAddKey}
-              onRunSync={handleRunSync}
-              showMessage={showMessage}
+            <Route path="/ledgerone" element={<Navigate to="/LedgerOne" replace />} />
+
+            <Route
+              path="/TallyBridge"
+              element={
+                <TallyBridgeView
+                  keys={records.keys}
+                  jobs={records.jobs}
+                  onAddKey={handleAddKey}
+                  onRunSync={handleRunSync}
+                  showMessage={showMessage}
+                />
+              }
             />
-          )}
+            <Route path="/tallybridge" element={<Navigate to="/TallyBridge" replace />} />
+
+            {/* Not Found Route */}
+            <Route path="*" element={<NotFoundView user={user} />} />
+          </Routes>
         </div>
       </main>
 
