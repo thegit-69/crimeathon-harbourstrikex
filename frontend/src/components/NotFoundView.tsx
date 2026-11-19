@@ -18,7 +18,7 @@ export function NotFoundView({ user }: NotFoundViewProps) {
         <button
           type="button"
           className="btn primary"
-          onClick={() => navigate(user ? '/Dashboard' : '/')}
+          onClick={() => navigate(user ? '/dashboard' : '/')}
         >
           {user ? 'Return to Dashboard' : 'Return to Sign In'}
         </button>

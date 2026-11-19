@@ -95,7 +95,7 @@ export default function App() {
     }
     setUser(username);
     showMessage(`Signed in as ${username}`);
-    navigate('/Dashboard');
+    navigate('/dashboard');
   };
 
   const handleLogout = () => {
@@ -166,7 +166,7 @@ export default function App() {
   // Route: /
   if (location.pathname === '/') {
     if (user) {
-      return <Navigate to="/Dashboard" replace />;
+      return <Navigate to="/dashboard" replace />;
     }
     return (
       <>
@@ -179,6 +179,16 @@ export default function App() {
   // Protected route check: if unauthenticated, redirect to /
   if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  // Compatibility redirect for misspelling
+  if (location.pathname.toLowerCase() === '/dashbord') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Normalize any uppercase/mixed-case URL to lowercase (e.g. /HelpDeskr -> /helpdeskr)
+  if (location.pathname !== location.pathname.toLowerCase()) {
+    return <Navigate to={location.pathname.toLowerCase() + location.search + location.hash} replace />;
   }
 
   const currentTheme = getThemeFromPath(location.pathname);
@@ -206,13 +216,11 @@ export default function App() {
 
         <div className="content" id="view">
           <Routes>
-            <Route path="/Dashboard" element={<DashboardView />} />
-            <Route path="/Dashbord" element={<Navigate to="/Dashboard" replace />} />
-            <Route path="/dashbord" element={<Navigate to="/Dashboard" replace />} />
-            <Route path="/dashboard" element={<Navigate to="/Dashboard" replace />} />
+            {/* Canonical lowercase routes */}
+            <Route path="/dashboard" element={<DashboardView />} />
 
             <Route
-              path="/HelpDeskr"
+              path="/helpdeskr"
               element={
                 <HelpDeskrView
                   tickets={records.tickets}
@@ -222,10 +230,9 @@ export default function App() {
                 />
               }
             />
-            <Route path="/helpdeskr" element={<Navigate to="/HelpDeskr" replace />} />
 
             <Route
-              path="/BlueVault"
+              path="/bluevault"
               element={
                 <BlueVaultView
                   docs={records.docs}
@@ -236,10 +243,9 @@ export default function App() {
                 />
               }
             />
-            <Route path="/bluevault" element={<Navigate to="/BlueVault" replace />} />
 
             <Route
-              path="/LedgerOne"
+              path="/ledgerone"
               element={
                 <LedgerOneView
                   vendors={records.vendors}
@@ -250,10 +256,9 @@ export default function App() {
                 />
               }
             />
-            <Route path="/ledgerone" element={<Navigate to="/LedgerOne" replace />} />
 
             <Route
-              path="/TallyBridge"
+              path="/tallybridge"
               element={
                 <TallyBridgeView
                   keys={records.keys}
@@ -264,7 +269,6 @@ export default function App() {
                 />
               }
             />
-            <Route path="/tallybridge" element={<Navigate to="/TallyBridge" replace />} />
 
             {/* Not Found Route */}
             <Route path="*" element={<NotFoundView user={user} />} />

@@ -34,7 +34,7 @@ export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
           type="button"
           data-page="dashboard"
           className={isDashboard ? 'active' : ''}
-          onClick={() => navigate('/Dashboard')}
+          onClick={() => navigate('/dashboard')}
         >
           ▦ &nbsp; Dashboard
         </button>
@@ -46,7 +46,7 @@ export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
           type="button"
           data-page="help"
           className={isHelp ? 'active' : ''}
-          onClick={() => navigate('/HelpDeskr')}
+          onClick={() => navigate('/helpdeskr')}
         >
           ▤ &nbsp; HelpDeskr
         </button>
@@ -54,7 +54,7 @@ export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
           type="button"
           data-page="blue"
           className={isBlue ? 'active' : ''}
-          onClick={() => navigate('/BlueVault')}
+          onClick={() => navigate('/bluevault')}
         >
           ▣ &nbsp; BlueVault
         </button>
@@ -62,7 +62,7 @@ export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
           type="button"
           data-page="ledger"
           className={isLedger ? 'active' : ''}
-          onClick={() => navigate('/LedgerOne')}
+          onClick={() => navigate('/ledgerone')}
         >
           ▥ &nbsp; LedgerOne
         </button>
@@ -70,7 +70,7 @@ export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
           type="button"
           data-page="tally"
           className={isTally ? 'active' : ''}
-          onClick={() => navigate('/TallyBridge')}
+          onClick={() => navigate('/tallybridge')}
         >
           ⌘ &nbsp; TallyBridge
         </button>

@@ -10,10 +10,10 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   const navigate = useNavigate();
 
   const routeMap: Record<Exclude<PageId, 'dashboard'>, string> = {
-    help: '/HelpDeskr',
-    blue: '/BlueVault',
-    ledger: '/LedgerOne',
-    tally: '/TallyBridge',
+    help: '/helpdeskr',
+    blue: '/bluevault',
+    ledger: '/ledgerone',
+    tally: '/tallybridge',
   };
 
   const handleModuleClick = (appId: Exclude<PageId, 'dashboard'>) => {
