@@ -1012,6 +1012,27 @@ tr:last-child td {
   --w-hover: #e3def2;
 }
 
+/* Evidence & Exploit Simulation — Deep navy / steel and restrained warning amber */
+#app[data-theme="evidence"] {
+  --w-bg: #e6ecf4;
+  --w-side: #d8e2ed;
+  --w-panel: #f8fafc;
+  --w-panel-alt: #e9eff6;
+  --w-line: #c5d3e3;
+  --w-text: #17263b;
+  --w-muted: #4e637e;
+  --w-primary: #1f3a5f;
+  --w-secondary: #d97706;
+  --w-tertiary: #b45309;
+  --w-primary-soft: #dbe6f5;
+  --w-secondary-soft: #fef3c7;
+  --w-tertiary-soft: #ffedd5;
+  --w-primary-ink: #132742;
+  --w-secondary-ink: #92400e;
+  --w-tertiary-ink: #78350f;
+  --w-hover: #dde7f3;
+}
+
 /* RESPONSIVE DESIGN */
 @media (max-width: 850px) {
   .stats {

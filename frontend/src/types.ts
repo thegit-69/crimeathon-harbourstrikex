@@ -1,6 +1,6 @@
-export type AppTheme = 'overview' | 'help' | 'blue' | 'ledger' | 'tally';
+export type AppTheme = 'overview' | 'help' | 'blue' | 'ledger' | 'tally' | 'evidence';
 
-export type PageId = 'dashboard' | 'help' | 'blue' | 'ledger' | 'tally';
+export type PageId = 'dashboard' | 'help' | 'blue' | 'ledger' | 'tally' | 'evidence';
 
 export interface AppDefinition {
   id: PageId;

@@ -1,6 +1,6 @@
 import type { AppDefinition, PageId, RecordsData } from '../types';
 
-export const APPS: Record<Exclude<PageId, 'dashboard'>, AppDefinition> = {
+export const APPS: Record<Exclude<PageId, 'dashboard' | 'evidence'>, AppDefinition> = {
   help: {
     id: 'help',
     name: 'HelpDeskr',
@@ -9,6 +9,7 @@ export const APPS: Record<Exclude<PageId, 'dashboard'>, AppDefinition> = {
     tabs: [
       'Tickets',
       'Comments & Notes',
+      'Export Jobs (E02/E06)',
       'Attachments',
       'Integration API',
       'Access Control',
@@ -24,8 +25,8 @@ export const APPS: Record<Exclude<PageId, 'dashboard'>, AppDefinition> = {
       'Folders & Documents',
       'Finance Folder',
       'API Keys',
+      'Access Logs (E05)',
       'Permissions',
-      'Access Logs',
     ],
   },
   ledger: {
@@ -39,7 +40,8 @@ export const APPS: Record<Exclude<PageId, 'dashboard'>, AppDefinition> = {
       'Invoices',
       'Payment Schedule',
       'Approvals',
-      'Change History',
+      'Change History (E19)',
+      'API Logs (E01/E18)',
     ],
   },
   tally: {
@@ -51,10 +53,11 @@ export const APPS: Record<Exclude<PageId, 'dashboard'>, AppDefinition> = {
       'API Keys',
       'Service Accounts',
       'Connected Apps',
+      'Build Host (tb-build-02)',
+      'Network Flows (E15)',
       'Permissions',
       'Token & IP Controls',
       'Sync Jobs',
-      'Build Host',
       'API Activity',
     ],
   },
@@ -62,33 +65,53 @@ export const APPS: Record<Exclude<PageId, 'dashboard'>, AppDefinition> = {
 
 export const INITIAL_RECORDS: RecordsData = {
   tickets: [
+    ['TKT-48213', 'Pune depot customer portal - POD document retrieval error (Key Leaked)', 'Sunita Iyer', 'High', 'Open', 'Support Queue'],
     ['HD-2048', 'Shipment documents access issue', 'Maya Chen', 'High', 'Open', 'Support Queue'],
     ['HD-2047', 'Invoice attachment missing', 'Arun Patel', 'Normal', 'In progress', 'Finance Support'],
     ['HD-2042', 'Vendor portal account update', 'Lena Morris', 'Low', 'Resolved', 'Support Queue'],
+    ['HD-2035', 'Warehouse terminal dev-81546 kiosk login audit', 'Prakash Menon', 'High', 'In progress', 'IT Helpdesk'],
+    ['HD-2031', 'Bulk export usage overage inquiry (Ref: INV-HD-2026-0831)', 'Madhavi Sundar', 'High', 'Open', 'Finance Support'],
   ],
   vendors: [
-    ['V-0412', 'Coastal Packaging Ltd.', '•••• 9083', 'Active', 'Pending review'],
+    ['V-0412', 'Coastal Packaging Ltd.', '•••• 9083', 'Tampered (Risk)', 'Unauthorized API Change'],
     ['V-0388', 'Northstar Freight Co.', '•••• 4417', 'Active', 'Approved'],
+    ['V-0104', 'Southern Haulage Corp', '•••• 3319', 'Active', 'Approved'],
+    ['V-0182', 'Deccan Container Lines', '•••• 6542', 'Active', 'Approved'],
+    ['V-0240', 'Coromandel Fuel Services', '•••• 1120', 'Active', 'Approved'],
     ['V-0291', 'Harbor Office Supplies', '•••• 7720', 'On hold', 'Needs review'],
+    ['V-0315', 'Bay Logistics Solutions', '•••• 8841', 'Active', 'Approved'],
   ],
   keys: [
-    ['key-tb-07', 'Finance IT', 'read:write all-modules', 'No expiry', 'Not restricted', 'Active'],
-    ['bvk-7f3a', 'Support Ops', 'read:all-folders', 'No expiry', 'Not restricted', 'Active'],
-    ['key-tb-03', 'Legacy service', 'read:vendors', 'Expired', '10.20.4.0/24', 'Disabled'],
+    ['key-tb-07', 'Finance IT (TallyBridge)', 'read:write all-modules', 'No expiry', 'Not restricted', 'Active (Compromised)'],
+    ['tb-sync-svc', 'Support Ops (TallyBridge)', 'admin', 'No expiry', 'Not restricted', 'Active (Compromised)'],
+    ['bvk-7f3a', 'Customer Portal / Support Ops', 'read:all-folders', 'No expiry', 'Not restricted', 'Active (Leaked in TKT-48213)'],
+    ['key-tb-03', 'Legacy service', 'read:vendors', 'Expired / Stale', '10.20.4.0/24', 'Active (Unrevoked F5)'],
+    ['key-bk-02', 'IT Ops (Backup Agent)', 'read:backup', '180 days', '172.16.8.0/24', 'Active (Compliant)'],
+    ['key-app-11', 'Operations IT (Customer Portal)', 'read:shipments', '365 days', '172.16.4.0/24', 'Active (Compliant)'],
+    ['key-rpt-03', 'BI Team (Reporting Engine)', 'read:analytics', '180 days', '172.16.2.0/24', 'Active (Compliant)'],
   ],
   docs: [
-    ['Coastal_Packaging_Bank_Instructions.pdf', 'Finance / Vendor Bank Details', 'PDF', 'Restricted'],
-    ['September_Payment_Run_Template.xlsx', 'Finance / Payment Runs', 'XLSX', 'Finance only'],
+    ['vendor-bank-details-2026.xlsx', 'Finance / Bank Instructions', 'XLSX', 'Exfiltrated (bv-edb0081dad)'],
+    ['payment-run-template.xlsx', 'Finance / Bank Instructions', 'XLSX', 'Exfiltrated (bv-94baddc5d7)'],
+    ['Coastal_Packaging_Bank_Instructions.pdf', 'Finance / Bank Instructions', 'PDF', 'Restricted (Genuine ****4417)'],
+    ['September_Payment_Run_Template.xlsx', 'Finance / Payment Runs', 'XLSX', 'Finance only (Disbursement 08 Sep)'],
+    ['stmt-2026-01_through_05.pdf', 'Finance / Statements', 'PDF', 'Exfiltrated (13 Statements)'],
     ['August_Financial_Statement.pdf', 'Finance / Statements', 'PDF', 'Finance only'],
+    ['Chennai_Warehouse_Manifest_Aug26.csv', 'Operations / Manifests', 'CSV', 'Internal Operations'],
   ],
   invoices: [
-    ['INV-9081', 'Coastal Packaging Ltd.', '₹2,48,000', '22 Nov 2026', 'Awaiting approval'],
-    ['INV-9074', 'Northstar Freight Co.', '₹86,500', '20 Nov 2026', 'Scheduled'],
-    ['INV-9068', 'Harbor Office Supplies', '₹32,800', '18 Nov 2026', 'Paid'],
+    ['INV-9081', 'Coastal Packaging Ltd.', '₹2,48,000', '08 Sep 2026', 'URGENT HOLD (Fraud Target)'],
+    ['INV-9074', 'Northstar Freight Co.', '₹86,500', '08 Sep 2026', 'Scheduled'],
+    ['INV-9055', 'Southern Haulage Corp', '₹5,40,000', '08 Sep 2026', 'Scheduled'],
+    ['INV-9042', 'Deccan Container Lines', '₹3,15,000', '08 Sep 2026', 'Scheduled'],
+    ['INV-9068', 'Harbor Office Supplies', '₹32,800', '08 Sep 2026', 'Paid'],
+    ['INV-HD-2026-0831', 'HelpDeskr (Overage Surcharge)', '₹26,550', '15 Sep 2026', 'Under Audit Review'],
   ],
   jobs: [
-    ['SYNC-8821', 'Vendor master sync', 'LedgerOne', '19 Nov · 08:30', 'Completed'],
-    ['SYNC-8819', 'Support ticket sync', 'HelpDeskr', '19 Nov · 08:00', 'Completed'],
-    ['SYNC-8814', 'Document metadata sync', 'BlueVault', '19 Nov · 07:30', 'Warning'],
+    ['EXP-5419', 'Bulk ticket export delete failure', 'HelpDeskr SaaS', '12 Aug · 00:33 IST', 'Timeout (Permanent Trace)'],
+    ['EXP-5410', 'Bulk support database extract', 'HelpDeskr SaaS', '11 Aug · 23:30 IST', 'Completed (Attacker)'],
+    ['SYNC-8821', 'Vendor master sync', 'LedgerOne', '07 Sep · 02:15 UTC', 'Completed'],
+    ['SYNC-8819', 'Support ticket sync', 'HelpDeskr', '07 Sep · 02:00 UTC', 'Completed'],
+    ['SYNC-8814', 'Document metadata sync', 'BlueVault', '07 Sep · 01:30 UTC', 'Warning (Clock Skew)'],
   ],
 };
