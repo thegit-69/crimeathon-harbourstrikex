@@ -12,6 +12,7 @@ export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
 
   const currentPath = location.pathname.toLowerCase();
   const isDashboard = currentPath === '/dashboard' || currentPath === '/dashbord';
+  const isEvidence = currentPath === '/evidence';
   const isHelp = currentPath === '/helpdeskr';
   const isBlue = currentPath === '/bluevault';
   const isLedger = currentPath === '/ledgerone';
@@ -76,9 +77,21 @@ export function Sidebar({ username, onLogout, onToggleSidebar }: SidebarProps) {
         </button>
       </nav>
 
+      <div className="label">INVESTIGATION</div>
+      <nav className="nav">
+        <button
+          type="button"
+          data-page="evidence"
+          className={isEvidence ? 'active' : ''}
+          onClick={() => navigate('/evidence')}
+        >
+          ⚡ &nbsp; Exploit & Attack Vectors
+        </button>
+      </nav>
+
       <div className="bottom">
         <p className="small">LOGGED IN AS</p>
-        <b id="uname">{username || 'Demo user'}</b>
+        <b id="uname">{username || 'demo_operator'}</b>
         <button type="button" className="btn ghost full" onClick={onLogout}>
           Sign out
         </button>

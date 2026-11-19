@@ -37,7 +37,7 @@ export function Auth({ onSignIn, showMessage }: AuthProps) {
     const u = loginUser.trim();
     const users = getUsers();
     if (!u || users[u] !== loginPass) {
-      showMessage('Invalid account. Create a demo account first.');
+      showMessage('Invalid credentials. Check username/password or register.');
       return;
     }
     onSignIn(u);
@@ -48,7 +48,7 @@ export function Auth({ onSignIn, showMessage }: AuthProps) {
     const u = regUser.trim();
     const p = regPass;
     if (!u || !p) {
-      showMessage('Enter username and password.');
+      showMessage('Please enter both username and password.');
       return;
     }
     if (p !== regConfirm) {
@@ -65,28 +65,40 @@ export function Auth({ onSignIn, showMessage }: AuthProps) {
     setLoginUser(u);
     setLoginPass(p);
     setView('login');
-    showMessage('Account created. Sign in now.');
+    showMessage('Demo account created. You may now sign in.');
   };
 
   return (
     <section className="auth">
       <div className="brand">
-        <div className="brand-mark" aria-label="HARBORSTRIKE logo">
+        <div className="brand-mark" aria-label="HARBORSTRIKE shield mark">
           <ShieldLogo />
         </div>
         <div className="brand-title">HARBORSTRIKE</div>
-        <div className="brand-apps">
+        <p className="text-xs text-slate-600 max-w-md leading-relaxed mt-1">
+          Synthetic enterprise operations & controlled OFFENSE attack simulation environment for Case <strong className="text-slate-900">CR-26-047</strong> (Harbor & Finch Freight Pvt. Ltd.).
+        </p>
+
+        <div className="brand-apps mt-4">
           <div className="brand-app">
-            <i>HD</i>HelpDeskr
+            <i>HD</i>
+            <span><strong>HelpDeskr</strong> — Support Tickets, Attachments & Exports</span>
           </div>
           <div className="brand-app">
-            <i>BV</i>BlueVault
+            <i>BV</i>
+            <span><strong>BlueVault</strong> — Document Storage & Finance Repositories</span>
           </div>
           <div className="brand-app">
-            <i>LO</i>LedgerOne
+            <i>LO</i>
+            <span><strong>LedgerOne</strong> — Vendor Master, Invoices & Disbursements</span>
           </div>
           <div className="brand-app">
-            <i>TB</i>TallyBridge
+            <i>TB</i>
+            <span><strong>TallyBridge</strong> — Machine API Credentials & Nightly Sync</span>
+          </div>
+          <div className="brand-app">
+            <i>⚡</i>
+            <span><strong>Exploit & Attack Vectors</strong> — Controlled Offense Workspace</span>
           </div>
         </div>
       </div>
@@ -95,26 +107,30 @@ export function Auth({ onSignIn, showMessage }: AuthProps) {
         <div className="card">
           {view === 'login' ? (
             <div>
-              <div className="eyebrow">WELCOME BACK</div>
+              <div className="eyebrow">OPERATOR AUTHENTICATION</div>
               <h2>Sign in</h2>
-              <p className="muted">Enter your simulation account details.</p>
-              <form onSubmit={handleSignIn}>
+              <p className="muted">Enter your local simulation operator credentials.</p>
+              <form onSubmit={handleSignIn} className="mt-4">
                 <div className="field">
-                  <label>USERNAME</label>
+                  <label htmlFor="login-username">OPERATOR USERNAME</label>
                   <input
+                    id="login-username"
                     value={loginUser}
                     onChange={(e) => setLoginUser(e.target.value)}
                     placeholder="Enter username"
+                    autoComplete="username"
                     autoFocus
                   />
                 </div>
                 <div className="field">
-                  <label>PASSWORD</label>
+                  <label htmlFor="login-password">PASSWORD</label>
                   <input
+                    id="login-password"
                     type="password"
                     value={loginPass}
                     onChange={(e) => setLoginPass(e.target.value)}
                     placeholder="Enter password"
+                    autoComplete="current-password"
                   />
                 </div>
                 <button type="submit" className="btn primary full">
@@ -122,51 +138,57 @@ export function Auth({ onSignIn, showMessage }: AuthProps) {
                 </button>
               </form>
               <p className="muted" style={{ textAlign: 'center', marginTop: '18px' }}>
-                No account?{' '}
+                Need a new login?{' '}
                 <button
                   type="button"
                   className="link"
                   onClick={() => setView('register')}
                 >
-                  Create new account
+                  Create demo account
                 </button>
               </p>
             </div>
           ) : (
             <div>
               <div className="eyebrow">NEW SIMULATION USER</div>
-              <h2>Create account</h2>
-              <p className="muted">Create a local demo account.</p>
-              <form onSubmit={handleRegister}>
+              <h2>Create demo account</h2>
+              <p className="muted">Create a local browser-stored simulation account.</p>
+              <form onSubmit={handleRegister} className="mt-4">
                 <div className="field">
-                  <label>USERNAME</label>
+                  <label htmlFor="reg-username">OPERATOR USERNAME</label>
                   <input
+                    id="reg-username"
                     value={regUser}
                     onChange={(e) => setRegUser(e.target.value)}
                     placeholder="Choose username"
+                    autoComplete="username"
                     autoFocus
                   />
                 </div>
                 <div className="field">
-                  <label>PASSWORD</label>
+                  <label htmlFor="reg-password">PASSWORD</label>
                   <input
+                    id="reg-password"
                     type="password"
                     value={regPass}
                     onChange={(e) => setRegPass(e.target.value)}
                     placeholder="Create password"
+                    autoComplete="new-password"
                   />
                 </div>
                 <div className="field">
-                  <label>CONFIRM PASSWORD</label>
+                  <label htmlFor="reg-confirm">CONFIRM PASSWORD</label>
                   <input
+                    id="reg-confirm"
                     type="password"
                     value={regConfirm}
                     onChange={(e) => setRegConfirm(e.target.value)}
                     placeholder="Confirm password"
+                    autoComplete="new-password"
                   />
                 </div>
                 <button type="submit" className="btn primary full">
-                  Create account
+                  Create Account & Sign In
                 </button>
               </form>
               <p className="muted" style={{ textAlign: 'center', marginTop: '18px' }}>
@@ -183,7 +205,7 @@ export function Auth({ onSignIn, showMessage }: AuthProps) {
           )}
 
           <div className="note">
-            Frontend demo only. Accounts are stored in this browser. Default demo account ready (<code>demo_operator</code> / <code>demo123</code>).
+            <strong>Local simulation environment only.</strong> Accounts and session tokens are stored in browser localStorage. Default demo account ready: <code>demo_operator</code> / <code>demo123</code>.
           </div>
         </div>
       </div>

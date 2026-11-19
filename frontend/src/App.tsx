@@ -12,6 +12,7 @@ import { HelpDeskrView } from './components/HelpDeskrView';
 import { BlueVaultView } from './components/BlueVaultView';
 import { LedgerOneView } from './components/LedgerOneView';
 import { TallyBridgeView } from './components/TallyBridgeView';
+import { EvidenceView } from './components/EvidenceView';
 import { NotFoundView } from './components/NotFoundView';
 
 function getThemeFromPath(pathname: string): AppTheme {
@@ -20,6 +21,7 @@ function getThemeFromPath(pathname: string): AppTheme {
   if (p === '/bluevault') return 'blue';
   if (p === '/ledgerone') return 'ledger';
   if (p === '/tallybridge') return 'tally';
+  if (p === '/evidence') return 'evidence';
   return 'overview';
 }
 
@@ -29,6 +31,7 @@ function getCrumbFromPath(pathname: string): string {
   if (p === '/bluevault') return 'BlueVault';
   if (p === '/ledgerone') return 'LedgerOne';
   if (p === '/tallybridge') return 'TallyBridge';
+  if (p === '/evidence') return 'Exploit & Attack Vectors';
   return 'Dashboard';
 }
 
@@ -200,8 +203,7 @@ export default function App() {
       className={sidebarOpen ? 'sidebar-open' : ''}
       data-theme={currentTheme}
     >
-      <div id="sideBackdrop" onClick={() => setSidebarOpen(false)} />
-
+      {/* Sidebar preserved across navigation; explicit brand/logo toggle only */}
       <Sidebar
         username={user}
         onLogout={handleLogout}
@@ -218,6 +220,7 @@ export default function App() {
           <Routes>
             {/* Canonical lowercase routes */}
             <Route path="/dashboard" element={<DashboardView />} />
+            <Route path="/evidence" element={<EvidenceView />} />
 
             <Route
               path="/helpdeskr"
