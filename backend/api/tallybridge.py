@@ -42,6 +42,19 @@ async def create_key(
     return key
 
 
+@router.delete("/keys/{key_id}", status_code=204)
+async def delete_key(
+    key_id: str,
+    actor: dict = Depends(get_current_actor),
+    db: AsyncSession = Depends(get_db),
+):
+    key = await db.get(ApiKey, key_id)
+    if not key:
+        raise HTTPException(404, "API key not found")
+    await db.delete(key)
+    await db.commit()
+
+
 @router.get("/service-accounts")
 async def list_service_accounts():
     return [
@@ -104,6 +117,19 @@ async def trigger_sync(
     await db.commit()
     await db.refresh(job)
     return job
+
+
+@router.delete("/sync-jobs/{job_id}", status_code=204)
+async def delete_sync_job(
+    job_id: str,
+    actor: dict = Depends(get_current_actor),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await db.get(SyncJob, job_id)
+    if not job:
+        raise HTTPException(404, "Sync job not found")
+    await db.delete(job)
+    await db.commit()
 
 
 @router.get("/network-flows", response_model=list[NetworkFlowOut])

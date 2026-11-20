@@ -47,14 +47,22 @@ async def get_current_actor(
     if x_api_key:
         # Lazy import to avoid circular
         from models.tallybridge import ApiKey
+        from models.bluevault import StorageKey
         from sqlalchemy import select
 
         result = await db.execute(select(ApiKey).where(ApiKey.id == x_api_key))
         key = result.scalar_one_or_none()
-        if not key or key.status != "Active":
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked API key")
-        # NOTE: intentionally NO IP restriction check, NO expiry check → attack surface
-        return {"actor": x_api_key, "type": "api_key", "scope": key.scope}
+        if key and key.status == "Active":
+            # NOTE: intentionally NO IP restriction check, NO expiry check → attack surface
+            return {"actor": x_api_key, "type": "api_key", "scope": key.scope}
+
+        # Also support BlueVault storage keys (e.g. bvk-7f3a leaked in ticket TKT-48213 from Case Evidence E13)
+        res_sk = await db.execute(select(StorageKey).where(StorageKey.id == x_api_key))
+        sk = res_sk.scalar_one_or_none()
+        if sk and sk.status == "Active":
+            return {"actor": x_api_key, "type": "storage_key", "scope": sk.scope}
+
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked API key")
 
     if authorization and authorization.startswith("Bearer "):
         token = authorization[7:]
