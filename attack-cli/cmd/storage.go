@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"harborstrike-x/attack-cli/pkg/utils"
+
+	"github.com/spf13/cobra"
 )
 
 var storageCmd = &cobra.Command{
@@ -31,7 +32,7 @@ enumerate documents in /finance, and exfiltrate master bank details and financia
 
 		utils.PrintInfo("Target Storage  : BlueVault Object Storage (/storage/files)")
 		utils.PrintInfo("Key Weaponized  : %s (Harvested from TKT-48213)", storageKey)
-		utils.PrintInfo("Origin Ingress  : 198.18.7.23 (Adversary Staging Host)",)
+		utils.PrintInfo("Origin Ingress  : 198.18.7.23 (Adversary Staging Host)")
 		fmt.Println()
 
 		data, err := cli.AccessStorage()

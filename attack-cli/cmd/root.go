@@ -85,7 +85,23 @@ func renderRootDashboard() {
 
 	// Section 2: Campaign, Workbench & Intelligence
 	fmt.Println()
-	utils.PrintHeader("Campaign Engine & Workbench")
+	utils.PrintHeader("Red-Team Evasion & Dynamic Weaponization (The Magic Touch)")
+	fmt.Println()
+	evasions := [][]string{
+		{"hso bypass", "Defense Evasion", "Maker-Checker bypass, Chronos smuggling & SOC decoy"},
+		{"hso weaponize", "Dynamic Exploit", "Arbitrary-target payload generator & PoC exporter (unseen data)"},
+		{"hso proof-pack", "Tier 3 Compiler", "Automated MITRE matrix, evidence join & SHA-256 proof pack"},
+	}
+	for _, e := range evasions {
+		fmt.Printf("  %s%-23s%s  %s%-16s%s  %s%s%s\n",
+			pink, e[0], reset,
+			yellow, e[1], reset,
+			white, e[2], reset)
+	}
+
+	// Section 3: Campaign, Workbench & Intelligence
+	fmt.Println()
+	utils.PrintHeader("Campaign Engine, Forensics & Workbench")
 	fmt.Println()
 	tools := [][]string{
 		{"hso campaign run", "Engine", "Run automated 8-phase attack with scorecard"},
