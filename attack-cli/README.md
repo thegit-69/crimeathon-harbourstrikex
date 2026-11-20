@@ -50,10 +50,16 @@ Present each phase individually to the evaluators using the compiled Go binary `
 # Step 8: Phase 8 — Validate Terminated Employee Kiosk Login (Decoy Analysis)
 .\dist\hso.exe auth-test
 
-# Step 9: Generate Executive Validation & MITRE ATT&CK Technical Report
+# Step 8 (Variant): Validate Admin Brute-Force Password Spray Probe (Case E13)
+.\dist\hso.exe auth-test --user a.kapoor
+
+# Step 9: Post-Exfil Anti-Forensics & Trace Elimination (T1070)
+.\dist\hso.exe anti-forensics
+
+# Step 10: Generate Executive Validation & MITRE ATT&CK Technical Report
 .\dist\hso.exe report
 
-# Step 10: Launch Interactive Multi-Pane Workbench (Posting-Inspired TUI)
+# Step 11: Launch Interactive Multi-Pane Workbench (Posting-Inspired TUI)
 .\dist\hso.exe ui
 ```
 

@@ -239,6 +239,13 @@ export default function App() {
     }));
   };
 
+  const handleDeleteSyncJob = (jobId: string) => {
+    setRecords((prev) => ({
+      ...prev,
+      jobs: prev.jobs.filter((j) => j[0] !== jobId),
+    }));
+  };
+
   // Route: /
   if (location.pathname === '/') {
     if (user) {
@@ -300,7 +307,7 @@ export default function App() {
           <Routes>
             {/* Canonical lowercase routes */}
             <Route path="/dashboard" element={<DashboardView />} />
-            <Route path="/evidence" element={<EvidenceView />} />
+            <Route path="/evidence" element={<EvidenceView showMessage={showMessage} />} />
 
             <Route
               path="/helpdeskr"
@@ -350,7 +357,9 @@ export default function App() {
                   keys={records.keys}
                   jobs={records.jobs}
                   onAddKey={handleAddKey}
+                  onDeleteKey={handleDeleteKey}
                   onRunSync={handleRunSync}
+                  onDeleteSyncJob={handleDeleteSyncJob}
                   showMessage={showMessage}
                 />
               }

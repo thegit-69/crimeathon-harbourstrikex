@@ -29,7 +29,7 @@ harvests ticket streams, and scans for leaked credentials (uncovering BlueVault 
 		gray := utils.ColorSlate
 		reset := utils.ColorReset
 
-		utils.PrintInfo("Target Service  : HelpDeskr Support SaaS (/api/v1/exports/bulk)")
+		utils.PrintInfo("Target Service  : HelpDeskr Support SaaS (/api/v1/support/exports)")
 		utils.PrintInfo("Sync Token Used : %s (HelpDeskr Integration Principal)", ticketToken)
 		utils.PrintInfo("Origin Ingress  : %s (Adversary Staging Proxy)", sourceIP)
 		fmt.Println()
@@ -40,11 +40,11 @@ harvests ticket streams, and scans for leaked credentials (uncovering BlueVault 
 			return
 		}
 
-		utils.PrintSuccess("HARVEST COMPLETED: 10 bulk exports executed; confidential secret uncovered in TKT-48213!")
+		utils.PrintSuccess("HARVEST COMPLETED: HelpDeskr export created and live ticket records scanned.")
 
 		// Pro Cyber HUD Card
 		cardLines := []string{
-			fmt.Sprintf(" Export Batch ID   : %s%v%s  %s[COMPLETED - 15,400 TICKETS]%s", white, data["export_id"], reset, green, reset),
+			fmt.Sprintf(" Export Batch ID   : %s%v%s  %s[COMPLETED - %v TICKET RECORDS]%s", white, data["export_id"], reset, green, data["records"], reset),
 			fmt.Sprintf(" Leaked Credential : %s%v%s  %s[CRITICAL SECRET DISCLOSED]%s", red, data["leaked_token"], reset, yellow, reset),
 			fmt.Sprintf(" Leaked In Ticket  : %s%v%s (Sunita Iyer pasted key into support chat)", cyan, data["leak_ticket"], reset),
 			fmt.Sprintf(" Financial Anomaly : %sInvoice INV-HD-2026-0831 flagged INR 22,500 overage%s", yellow, reset),

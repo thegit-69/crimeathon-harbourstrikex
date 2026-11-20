@@ -133,3 +133,17 @@ func TestUICmd(t *testing.T) {
 		t.Fatalf("ui command failed: %v, output: %s", err, output)
 	}
 }
+
+func TestAntiForensicsCmd(t *testing.T) {
+	output, err := executeCommand("anti-forensics", "--mode", "simulate")
+	if err != nil {
+		t.Fatalf("anti-forensics command failed: %v, output: %s", err, output)
+	}
+}
+
+func TestAuthTestAdminCmd(t *testing.T) {
+	output, err := executeCommand("auth-test", "--user", "a.kapoor", "--mode", "simulate")
+	if err != nil {
+		t.Fatalf("auth-test admin command failed: %v, output: %s", err, output)
+	}
+}

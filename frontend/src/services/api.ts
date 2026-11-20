@@ -552,6 +552,12 @@ export const tallybridgeApi = {
     });
   },
 
+  deleteKey: async (keyId: string): Promise<void> => {
+    return apiRequest<void>(`/api/integration/keys/${keyId}`, {
+      method: 'DELETE',
+    });
+  },
+
   getServiceAccounts: async (): Promise<ServiceAccountDto[]> => {
     return apiRequest<ServiceAccountDto[]>('/api/integration/service-accounts');
   },
@@ -572,6 +578,12 @@ export const tallybridgeApi = {
     return apiRequest<SyncJobDto>('/api/integration/sync-jobs', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  deleteSyncJob: async (jobId: string): Promise<void> => {
+    return apiRequest<void>(`/api/integration/sync-jobs/${jobId}`, {
+      method: 'DELETE',
     });
   },
 

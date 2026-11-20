@@ -1,7 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { KeyRecord, SyncJobRecord } from '../types';
 import { APPS } from '../data/mockData';
 import { FORENSIC_API_LOGS } from '../data/caseEvidenceData';
+import {
+  tallybridgeApi,
+  converters,
+  type ServiceAccountDto,
+  type ConnectedAppDto,
+  type PermissionReviewDto,
+  type NetworkFlowDto,
+  type ApiActivityItem,
+} from '../services/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -30,13 +39,16 @@ import {
   Terminal,
   ShieldAlert,
   Plus,
+  Trash2,
 } from 'lucide-react';
 
 interface TallyBridgeViewProps {
   keys: KeyRecord[];
   jobs: SyncJobRecord[];
   onAddKey: (key: KeyRecord) => void;
+  onDeleteKey?: (keyId: string) => void;
   onRunSync: (job: SyncJobRecord) => void;
+  onDeleteSyncJob?: (jobId: string) => void;
   showMessage: (msg: string) => void;
 }
 
@@ -44,10 +56,22 @@ export function TallyBridgeView({
   keys,
   jobs,
   onAddKey,
+  onDeleteKey,
   onRunSync,
+  onDeleteSyncJob,
   showMessage,
 }: TallyBridgeViewProps) {
   const [activeTab, setActiveTab] = useState('keys');
+
+  // Live state from backend
+  const [liveKeys, setLiveKeys] = useState<KeyRecord[]>(keys);
+  const [liveJobs, setLiveJobs] = useState<SyncJobRecord[]>(jobs);
+  const [liveAccounts, setLiveAccounts] = useState<ServiceAccountDto[]>([]);
+  const [liveApps, setLiveApps] = useState<ConnectedAppDto[]>([]);
+  const [livePerms, setLivePerms] = useState<PermissionReviewDto[]>([]);
+  const [liveFlows, setLiveFlows] = useState<NetworkFlowDto[]>([]);
+  const [liveActivity, setLiveActivity] = useState<ApiActivityItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Create API Key modal
   const [isAddKeyOpen, setIsAddKeyOpen] = useState(false);
@@ -56,13 +80,13 @@ export function TallyBridgeView({
   const [keyExpiry, setKeyExpiry] = useState('90 days');
   const [keyIp, setKeyIp] = useState('10.20.4.0/24');
 
-  // Service accounts
+  // Service accounts modal
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [accountName, setAccountName] = useState('');
   const [accountTeam, setAccountTeam] = useState('IT Operations');
   const [accountPurpose, setAccountPurpose] = useState('Database replication');
 
-  // Connected apps
+  // Connected apps modal
   const [isConnectAppOpen, setIsConnectAppOpen] = useState(false);
   const [appName, setAppName] = useState('');
   const [appEnv, setAppEnv] = useState('Simulated');
@@ -75,30 +99,163 @@ export function TallyBridgeView({
   const [hostLabel, setHostLabel] = useState('tb-build-02');
   const [hostEnv, setHostEnv] = useState('Private Link (10.20.4.77)');
 
-  const handleCreateKey = (e: React.FormEvent) => {
+  // Async data fetch on mount
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled([
+      tallybridgeApi.getKeys(),
+      tallybridgeApi.getSyncJobs(),
+      tallybridgeApi.getServiceAccounts(),
+      tallybridgeApi.getConnectedApps(),
+      tallybridgeApi.getPermissions(),
+      tallybridgeApi.getNetworkFlows(),
+      tallybridgeApi.getApiActivity(),
+    ]).then(([kRes, jRes, aRes, apRes, pRes, fRes, actRes]) => {
+      if (!active) return;
+      if (kRes.status === 'fulfilled' && kRes.value.length > 0) {
+        setLiveKeys(kRes.value.map(converters.keyToRecord));
+      }
+      if (jRes.status === 'fulfilled' && jRes.value.length > 0) {
+        setLiveJobs(jRes.value.map(converters.syncJobToRecord));
+      }
+      if (aRes.status === 'fulfilled') setLiveAccounts(aRes.value);
+      if (apRes.status === 'fulfilled') setLiveApps(apRes.value);
+      if (pRes.status === 'fulfilled') setLivePerms(pRes.value);
+      if (fRes.status === 'fulfilled') setLiveFlows(fRes.value);
+      if (actRes.status === 'fulfilled') setLiveActivity(actRes.value);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Manual DB sync
+  const loadTallyData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [kRes, jRes, aRes, apRes, pRes, fRes, actRes] = await Promise.allSettled([
+        tallybridgeApi.getKeys(),
+        tallybridgeApi.getSyncJobs(),
+        tallybridgeApi.getServiceAccounts(),
+        tallybridgeApi.getConnectedApps(),
+        tallybridgeApi.getPermissions(),
+        tallybridgeApi.getNetworkFlows(),
+        tallybridgeApi.getApiActivity(),
+      ]);
+
+      if (kRes.status === 'fulfilled' && kRes.value.length > 0) {
+        setLiveKeys(kRes.value.map(converters.keyToRecord));
+      }
+      if (jRes.status === 'fulfilled' && jRes.value.length > 0) {
+        setLiveJobs(jRes.value.map(converters.syncJobToRecord));
+      }
+      if (aRes.status === 'fulfilled') setLiveAccounts(aRes.value);
+      if (apRes.status === 'fulfilled') setLiveApps(apRes.value);
+      if (pRes.status === 'fulfilled') setLivePerms(pRes.value);
+      if (fRes.status === 'fulfilled') setLiveFlows(fRes.value);
+      if (actRes.status === 'fulfilled') setLiveActivity(actRes.value);
+    } catch {
+      // offline fallback
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // 1. CREATE API KEY
+  const handleCreateKey = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!keyOwner.trim()) {
       showMessage('Key owner is required.');
       return;
     }
-    const newId = `key-tb-${Math.floor(10 + Math.random() * 90)}`;
-    onAddKey([
-      newId,
+    const fallbackId = `key-tb-${Math.floor(10 + Math.random() * 90)}`;
+    const newRecord: KeyRecord = [
+      fallbackId,
       keyOwner.trim(),
       keyScope,
       keyExpiry,
       keyIp || 'Not restricted',
       'Active',
-    ]);
+    ];
+
+    try {
+      const created = await tallybridgeApi.createKey({
+        owner: keyOwner.trim(),
+        scope: keyScope,
+        expiry: keyExpiry,
+        ip_restrict: keyIp || 'Not restricted',
+      });
+      const rec = converters.keyToRecord(created);
+      onAddKey(rec);
+      setLiveKeys((prev) => [rec, ...prev]);
+      showMessage(`API Key ${rec[0]} provisioned via API.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      onAddKey(newRecord);
+      setLiveKeys((prev) => [newRecord, ...prev]);
+      showMessage(`Key created locally (${msg}).`);
+    }
+
     setIsAddKeyOpen(false);
     setKeyOwner('');
-    showMessage('API key created in simulation.');
   };
 
-  const handleTriggerSync = () => {
-    const newId = `SYNC-${Math.floor(8825 + Math.random() * 50)}`;
-    onRunSync([newId, 'Manual ad-hoc sync', 'Enterprise Bus', 'Just now', 'Completed']);
-    showMessage('Sync job queued in simulation.');
+  // 2. DELETE / REVOKE KEY
+  const handleDeleteKey = async (keyId: string) => {
+    try {
+      await tallybridgeApi.deleteKey(keyId);
+      showMessage(`API Key ${keyId} revoked via API.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showMessage(`Key revoked locally (${msg}).`);
+    }
+    if (onDeleteKey) {
+      onDeleteKey(keyId);
+    }
+    setLiveKeys((prev) => prev.filter((k) => k[0] !== keyId));
+  };
+
+  // 3. TRIGGER SYNC JOB
+  const handleTriggerSync = async () => {
+    const fallbackId = `SYNC-${Math.floor(8825 + Math.random() * 50)}`;
+    const newRecord: SyncJobRecord = [
+      fallbackId,
+      'Manual ad-hoc batch sync',
+      'Enterprise Bus',
+      'Just now',
+      'Completed',
+    ];
+
+    try {
+      const job = await tallybridgeApi.triggerSync({
+        name: 'Manual ad-hoc batch sync',
+        target: 'Enterprise Bus (LedgerOne)',
+      });
+      const rec = converters.syncJobToRecord(job);
+      onRunSync(rec);
+      setLiveJobs((prev) => [rec, ...prev]);
+      showMessage(`Sync Job ${rec[0]} completed via API.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      onRunSync(newRecord);
+      setLiveJobs((prev) => [newRecord, ...prev]);
+      showMessage(`Sync job executed locally (${msg}).`);
+    }
+  };
+
+  // 4. DELETE SYNC JOB
+  const handleDeleteSyncJob = async (jobId: string) => {
+    try {
+      await tallybridgeApi.deleteSyncJob(jobId);
+      showMessage(`Sync Job ${jobId} deleted via API.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showMessage(`Job removed locally (${msg}).`);
+    }
+    if (onDeleteSyncJob) {
+      onDeleteSyncJob(jobId);
+    }
+    setLiveJobs((prev) => prev.filter((j) => j[0] !== jobId));
   };
 
   return (
@@ -118,6 +275,17 @@ export function TallyBridgeView({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadTallyData}
+            disabled={isLoading}
+            className="text-xs border-slate-300"
+            title="Refresh integration database records"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Sync DB
+          </Button>
           <Badge variant="risk" className="text-xs">
             ● Private Link Subnet: 10.20.4.0/24
           </Badge>
@@ -141,7 +309,7 @@ export function TallyBridgeView({
           <TabsTrigger value="apiactivity" className="py-2">API Activity</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: API Keys */}
+        {/* Tab 1: API Keys (Create, Read, Delete/Revoke) */}
         <TabsContent value="keys">
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
@@ -171,11 +339,12 @@ export function TallyBridgeView({
                     <TableHead className="w-[180px]">Scope Granted</TableHead>
                     <TableHead className="w-[130px]">Token Expiry</TableHead>
                     <TableHead className="w-[160px]">IP Restriction</TableHead>
-                    <TableHead className="w-[180px]">Audit Status</TableHead>
+                    <TableHead className="w-[140px]">Audit Status</TableHead>
+                    <TableHead className="w-[90px] text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {keys.map((k, i) => (
+                  {liveKeys.map((k, i) => (
                     <TableRow
                       key={i}
                       className={
@@ -215,6 +384,17 @@ export function TallyBridgeView({
                           {k[5]}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteKey(k[0])}
+                          className="text-xs h-7 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          title="Revoke / Delete Key"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -250,30 +430,37 @@ export function TallyBridgeView({
                   <TableRow>
                     <TableHead className="w-[160px]">Account Name</TableHead>
                     <TableHead>Managing Team</TableHead>
-                    <TableHead className="w-[180px]">Target Application</TableHead>
-                    <TableHead className="w-[180px]">Assigned Role</TableHead>
-                    <TableHead className="w-[180px]">Privilege Classification</TableHead>
+                    <TableHead className="w-[180px]">Purpose</TableHead>
+                    <TableHead className="w-[140px]">Last Used</TableHead>
+                    <TableHead className="w-[140px]">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[
-                    ['tb-sync-svc', 'Support Ops / TallyBridge', 'HelpDeskr & LedgerOne', 'Global Sync Agent', 'Admin (Excessive)'],
-                    ['tb-mon-01', 'TallyBridge Network Ops', 'Private Tunnel Gateway', 'Ping Heartbeat', 'Port 0 only'],
-                    ['tb-build-02', 'Vendor CI/CD Infrastructure', 'LedgerOne & Sandbox', 'Build Server (Unregistered)', 'ROGUE HOST (Compromised)'],
-                    ['bv-archive-svc', 'IT Operations', 'BlueVault', 'Doc Archival', 'Folder-scoped'],
-                  ].map((r, i) => (
-                    <TableRow key={i} className={r[0] === 'tb-build-02' ? 'bg-rose-100/70 font-semibold' : undefined}>
-                      <TableCell className="font-mono text-xs font-bold">{r[0]}</TableCell>
-                      <TableCell className="text-xs">{r[1]}</TableCell>
-                      <TableCell className="text-xs font-bold text-slate-900">{r[2]}</TableCell>
-                      <TableCell className="text-xs">{r[3]}</TableCell>
+                  {/* Dynamic service accounts */}
+                  {liveAccounts.map((acc, i) => (
+                    <TableRow key={i} className={acc.id === 'tb-sync-svc' ? 'bg-rose-50/70 font-semibold' : undefined}>
+                      <TableCell className="font-mono text-xs font-bold">{acc.id}</TableCell>
+                      <TableCell className="text-xs">{acc.owner_team}</TableCell>
+                      <TableCell className="text-xs font-bold text-slate-900">{acc.purpose}</TableCell>
+                      <TableCell className="font-mono text-xs">{acc.last_used}</TableCell>
                       <TableCell>
-                        <Badge variant={r[4].includes('ROGUE') || r[4].includes('Excessive') ? 'risk' : 'ok'} className="text-[10px]">
-                          {r[4]}
+                        <Badge variant={acc.status === 'Active' ? 'ok' : 'warn'} className="text-[10px]">
+                          {acc.status}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
+
+                  {/* Fallback Seed Accounts */}
+                  {liveAccounts.length === 0 && (
+                    <TableRow className="bg-rose-100/70 font-semibold">
+                      <TableCell className="font-mono text-xs font-bold">tb-sync-svc</TableCell>
+                      <TableCell className="text-xs">Finance IT</TableCell>
+                      <TableCell className="text-xs font-bold">Vendor and ticket sync</TableCell>
+                      <TableCell className="font-mono text-xs">19 Nov 08:30</TableCell>
+                      <TableCell><Badge variant="risk" className="text-[10px]">Active</Badge></TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -306,31 +493,36 @@ export function TallyBridgeView({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[180px]">Application</TableHead>
-                    <TableHead className="w-[180px]">Channel</TableHead>
-                    <TableHead className="w-[160px]">Credential Used</TableHead>
-                    <TableHead>Permissions Granted</TableHead>
-                    <TableHead className="w-[180px]">Status</TableHead>
+                    <TableHead className="w-[140px]">Environment</TableHead>
+                    <TableHead className="w-[160px]">Account</TableHead>
+                    <TableHead>Permissions</TableHead>
+                    <TableHead className="w-[140px]">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[
-                    ['LedgerOne (Production)', 'Private Link (10.20.4.0/24)', 'key-tb-07', 'read:write all-modules', 'Connected (Compromised)'],
-                    ['LedgerOne (Sandbox Staging)', 'Private Link (10.20.4.0/24)', 'sandbox-test-key', 'read:all', 'Probed on 09 July (E15)'],
-                    ['HelpDeskr (Support)', 'External Cloud API', 'tb-sync-svc', 'admin (unrestricted)', 'Connected (Compromised)'],
-                    ['BlueVault (Storage)', 'Storage API', 'bvk-7f3a', 'read:all-folders', 'Connected (Leaked in Chat)'],
-                  ].map((r, i) => (
-                    <TableRow key={i} className={r[4].includes('Compromised') ? 'bg-rose-50/60 font-semibold' : undefined}>
-                      <TableCell className="text-xs font-bold text-slate-900">{r[0]}</TableCell>
-                      <TableCell className="text-xs text-slate-600">{r[1]}</TableCell>
-                      <TableCell><code className="text-xs font-mono font-bold">{r[2]}</code></TableCell>
-                      <TableCell className="text-xs">{r[3]}</TableCell>
+                  {/* Dynamic apps */}
+                  {liveApps.map((a, i) => (
+                    <TableRow key={i} className={a.status === 'Review' ? 'bg-amber-50/70' : undefined}>
+                      <TableCell className="text-xs font-bold text-slate-900">{a.app}</TableCell>
+                      <TableCell className="text-xs text-slate-600">{a.env}</TableCell>
+                      <TableCell><code className="text-xs font-mono font-bold">{a.account}</code></TableCell>
+                      <TableCell className="text-xs">{a.permissions}</TableCell>
                       <TableCell>
-                        <Badge variant={r[4].includes('Compromised') ? 'risk' : 'warn'} className="text-[10px]">
-                          {r[4]}
+                        <Badge variant={a.status === 'Connected' ? 'ok' : 'warn'} className="text-[10px]">
+                          {a.status}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
+                  {liveApps.length === 0 && (
+                    <TableRow>
+                      <TableCell className="text-xs font-bold">LedgerOne</TableCell>
+                      <TableCell className="text-xs">Production</TableCell>
+                      <TableCell><code>tb-sync-svc</code></TableCell>
+                      <TableCell className="text-xs">Vendor read/write</TableCell>
+                      <TableCell><Badge variant="ok" className="text-[10px]">Connected</Badge></TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -456,71 +648,56 @@ export function TallyBridgeView({
                   Private-Link Network Flow Log Analysis (E15)
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Analysis of 9,790 flows across <code>10.20.4.0/24</code> subnet.
+                  Real-time network flows queried from PostgreSQL database table.
                 </CardDescription>
               </div>
               <Badge variant="risk" className="text-xs shrink-0">
-                70 Rogue Flows Identified
+                {liveFlows.length > 0 ? `${liveFlows.length} Flows Ingested` : '70 Rogue Flows Identified'}
               </Badge>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[170px]">Date / Time (UTC)</TableHead>
-                    <TableHead className="w-[130px]">Source IP</TableHead>
+                    <TableHead className="w-[140px]">Source IP</TableHead>
                     <TableHead className="w-[140px]">Host Label</TableHead>
-                    <TableHead className="w-[160px]">Destination</TableHead>
-                    <TableHead className="w-[80px]">Port</TableHead>
-                    <TableHead className="w-[180px]">Bytes Transferred</TableHead>
-                    <TableHead>Behavioral Assessment</TableHead>
+                    <TableHead className="w-[140px]">Destination IP</TableHead>
+                    <TableHead>Endpoint</TableHead>
+                    <TableHead className="w-[140px]">Bytes Sent</TableHead>
+                    <TableHead className="w-[100px]">Verdict</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow className="bg-rose-100/80 font-bold">
-                    <TableCell className="font-mono text-xs">17-19 Aug 12:10–13:01</TableCell>
-                    <TableCell className="font-mono text-xs text-rose-950">10.20.4.77</TableCell>
-                    <TableCell className="font-bold text-rose-950">tb-build-02</TableCell>
-                    <TableCell className="font-bold text-rose-950">LedgerOne Production</TableCell>
-                    <TableCell className="font-mono text-xs">443</TableCell>
-                    <TableCell className="font-mono text-xs text-rose-950">22,215,099 bytes in (~22.2 MB)</TableCell>
-                    <TableCell>
-                      <Badge variant="risk" className="text-[10px]">Malicious Database Exfil</Badge>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow className="bg-rose-50/50">
-                    <TableCell className="font-mono text-xs">09 July 22:00–22:52</TableCell>
-                    <TableCell className="font-mono text-xs">10.20.4.77</TableCell>
-                    <TableCell className="font-bold text-rose-900">tb-build-02</TableCell>
-                    <TableCell className="font-bold text-slate-800">LedgerOne-sandbox</TableCell>
-                    <TableCell className="font-mono text-xs">443</TableCell>
-                    <TableCell className="font-mono text-xs">331 KB in / 94 KB out</TableCell>
-                    <TableCell>
-                      <Badge variant="warn" className="text-[10px]">Staging Reconnaissance</Badge>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-xs">Nightly (01:00–02:59)</TableCell>
-                    <TableCell className="font-mono text-xs">10.20.4.11–.16</TableCell>
-                    <TableCell className="text-slate-800">tb-sync-01..06</TableCell>
-                    <TableCell className="text-slate-800">LedgerOne & HelpDeskr</TableCell>
-                    <TableCell className="font-mono text-xs">443</TableCell>
-                    <TableCell className="font-mono text-xs">~14 KB per flow</TableCell>
-                    <TableCell>
-                      <Badge variant="ok" className="text-[10px]">Legitimate Nightly Sync</Badge>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-mono text-xs">Continuous (Every 10m)</TableCell>
-                    <TableCell className="font-mono text-xs">10.20.4.10</TableCell>
-                    <TableCell className="text-slate-800">tb-mon-01</TableCell>
-                    <TableCell className="text-slate-800">TunnelGateway</TableCell>
-                    <TableCell className="font-mono text-xs">0</TableCell>
-                    <TableCell className="font-mono text-xs">64 bytes (ICMP)</TableCell>
-                    <TableCell>
-                      <Badge variant="ok" className="text-[10px]">Heartbeat Ping</Badge>
-                    </TableCell>
-                  </TableRow>
+                  {/* Dynamic network flows */}
+                  {liveFlows.map((f) => (
+                    <TableRow
+                      key={f.id}
+                      className={f.verdict === 'Flagged' ? 'bg-rose-100/70 font-semibold' : undefined}
+                    >
+                      <TableCell className="font-mono text-xs font-bold text-slate-900">{f.src_ip}</TableCell>
+                      <TableCell className="font-bold text-xs">{f.host_label}</TableCell>
+                      <TableCell className="font-mono text-xs">{f.dst_ip}</TableCell>
+                      <TableCell className="font-mono text-xs">{f.endpoint}</TableCell>
+                      <TableCell className="font-mono text-xs">{f.bytes_sent}</TableCell>
+                      <TableCell>
+                        <Badge variant={f.verdict === 'Flagged' ? 'risk' : 'ok'} className="text-[10px]">
+                          {f.verdict}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+
+                  {/* Fallback Historical Seed Rows */}
+                  {liveFlows.length === 0 && (
+                    <TableRow className="bg-rose-100/80 font-bold">
+                      <TableCell className="font-mono text-xs text-rose-950">10.20.4.77</TableCell>
+                      <TableCell className="font-bold text-rose-950">tb-build-02</TableCell>
+                      <TableCell className="font-mono text-xs">10.20.4.5</TableCell>
+                      <TableCell className="font-mono text-xs">/api/v2/vendors/V-0412/bank-details</TableCell>
+                      <TableCell className="font-mono text-xs">22.2 MB</TableCell>
+                      <TableCell><Badge variant="risk" className="text-[10px]">Flagged</Badge></TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -544,29 +721,35 @@ export function TallyBridgeView({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Principal</TableHead>
-                    <TableHead>Application</TableHead>
+                    <TableHead>Owner</TableHead>
                     <TableHead>Granted Scope</TableHead>
-                    <TableHead>Recommended Scope</TableHead>
-                    <TableHead className="w-[180px]">Security Risk</TableHead>
+                    <TableHead>IP Restriction</TableHead>
+                    <TableHead className="w-[140px]">Security Risk</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[
-                    ['key-tb-07', 'LedgerOne', 'read:write all-modules', 'vendor:read, vendor:contact:update', 'CRITICAL (Enabled Bank Tampering)'],
-                    ['tb-sync-svc', 'HelpDeskr', 'admin', 'ticket:read, ticket:sync', 'CRITICAL (Enabled Mass Ticket Exfil)'],
-                    ['bvk-7f3a', 'BlueVault', 'read:all-folders', 'customer-docs:read', 'CRITICAL (Enabled Bank Sheet Theft)'],
-                    ['key-tb-03', 'LedgerOne', 'read:vendors', 'REVOKE (Superseded Key)', 'MEDIUM (Stale Account)'],
-                  ].map((r, i) => (
-                    <TableRow key={i} className="bg-rose-50/60 font-semibold">
-                      <TableCell><code className="text-xs font-bold">{r[0]}</code></TableCell>
-                      <TableCell className="text-xs font-bold text-slate-900">{r[1]}</TableCell>
-                      <TableCell><code className="text-xs text-rose-700 font-bold">{r[2]}</code></TableCell>
-                      <TableCell className="text-xs text-slate-800">{r[3]}</TableCell>
+                  {livePerms.map((p, i) => (
+                    <TableRow key={i} className={p.risk === 'Over-privileged' ? 'bg-rose-50/60 font-semibold' : undefined}>
+                      <TableCell><code className="text-xs font-bold">{p.principal}</code></TableCell>
+                      <TableCell className="text-xs font-bold text-slate-900">{p.owner}</TableCell>
+                      <TableCell><code className="text-xs text-rose-700 font-bold">{p.scope}</code></TableCell>
+                      <TableCell className="text-xs text-slate-800">{p.ip_restrict}</TableCell>
                       <TableCell>
-                        <Badge variant="risk" className="text-[10px]">{r[4]}</Badge>
+                        <Badge variant={p.risk === 'Over-privileged' ? 'risk' : 'warn'} className="text-[10px]">
+                          {p.risk}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
+                  {livePerms.length === 0 && (
+                    <TableRow className="bg-rose-50/60 font-semibold">
+                      <TableCell><code>key-tb-07</code></TableCell>
+                      <TableCell className="text-xs font-bold">TallyBridge Sync</TableCell>
+                      <TableCell><code className="text-rose-700 font-bold">read:write all-modules</code></TableCell>
+                      <TableCell className="text-xs">Not restricted</TableCell>
+                      <TableCell><Badge variant="risk" className="text-[10px]">Over-privileged</Badge></TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -648,7 +831,7 @@ export function TallyBridgeView({
           </div>
         </TabsContent>
 
-        {/* Tab 8: Sync Jobs */}
+        {/* Tab 8: Sync Jobs (Create, Read, Delete) */}
         <TabsContent value="syncjobs">
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
@@ -677,11 +860,12 @@ export function TallyBridgeView({
                     <TableHead>Job Description</TableHead>
                     <TableHead className="w-[180px]">Target Application</TableHead>
                     <TableHead className="w-[180px]">Execution Timestamp</TableHead>
-                    <TableHead className="w-[140px]">Status</TableHead>
+                    <TableHead className="w-[120px]">Status</TableHead>
+                    <TableHead className="w-[80px] text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {jobs.map((j, i) => (
+                  {liveJobs.map((j, i) => (
                     <TableRow key={i} className={j[4].includes('Timeout') ? 'bg-rose-100/70 font-semibold' : undefined}>
                       <TableCell className="font-mono text-xs font-bold">{j[0]}</TableCell>
                       <TableCell className="text-xs font-bold text-slate-900">{j[1]}</TableCell>
@@ -691,6 +875,17 @@ export function TallyBridgeView({
                         <Badge variant={j[4].includes('Timeout') ? 'risk' : j[4] === 'Completed' ? 'ok' : 'warn'} className="text-[10px]">
                           {j[4]}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteSyncJob(j[0])}
+                          className="text-xs h-7 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          title="Delete Sync Job"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -707,56 +902,62 @@ export function TallyBridgeView({
               <div>
                 <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
                   <Terminal className="w-4 h-4 text-slate-500" />
-                  Integration API Activity Log (E01 & E18)
+                  Integration API Activity Log (Live Stream & E01/E18)
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  API calls executed by TallyBridge credentials key-tb-07 and tb-sync-svc.
+                  Unified live audit activity streamed from database across business systems.
                 </CardDescription>
               </div>
               <Badge variant="risk" className="text-xs shrink-0">
-                12 Malicious API Calls Flagged
+                {liveActivity.length > 0 ? `${liveActivity.length} Live Activity Records` : '12 Forensic API Calls Flagged'}
               </Badge>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[140px]">Request ID</TableHead>
-                    <TableHead className="w-[160px]">Timestamp (UTC)</TableHead>
-                    <TableHead className="w-[120px]">Credential</TableHead>
-                    <TableHead className="w-[130px]">Caller IP</TableHead>
-                    <TableHead>Method & Endpoint</TableHead>
+                    <TableHead className="w-[140px]">System</TableHead>
+                    <TableHead className="w-[140px]">Credential</TableHead>
+                    <TableHead className="w-[100px]">Method</TableHead>
+                    <TableHead>Endpoint</TableHead>
                     <TableHead className="w-[80px]">Status</TableHead>
-                    <TableHead className="w-[80px]">Records</TableHead>
-                    <TableHead>Security Footprint</TableHead>
+                    <TableHead className="w-[160px]">Timestamp</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {FORENSIC_API_LOGS.map((r, i) => (
+                  {/* Dynamic API Activity from Backend */}
+                  {liveActivity.map((r, i) => (
                     <TableRow
                       key={i}
-                      className={
-                        r.phaseCategory === 'FRAUD EXECUTION'
-                          ? 'bg-rose-100/80 font-bold'
-                          : r.anomalyFlag
-                          ? 'bg-rose-50/50'
-                          : undefined
-                      }
+                      className={r.endpoint?.includes('bank-details') ? 'bg-rose-100/80 font-bold' : undefined}
                     >
-                      <TableCell className="font-mono text-xs font-bold">{r.requestId}</TableCell>
-                      <TableCell className="font-mono text-xs">{r.timestampUtc}</TableCell>
-                      <TableCell><code className="text-xs font-bold">{r.apiKeyId}</code></TableCell>
-                      <TableCell className="font-mono text-xs">{r.callerIp}</TableCell>
-                      <TableCell className="font-mono text-xs font-bold">{r.method} {r.endpoint}</TableCell>
+                      <TableCell className="font-bold text-xs">{r.system}</TableCell>
+                      <TableCell><code className="text-xs font-bold">{r.actor || 'anonymous'}</code></TableCell>
+                      <TableCell className="font-mono text-xs font-bold">{r.method}</TableCell>
+                      <TableCell className="font-mono text-xs">{r.endpoint}</TableCell>
                       <TableCell>
-                        <Badge variant={r.statusCode === 200 || r.statusCode === 204 ? 'ok' : 'risk'} className="text-[10px]">
-                          {r.statusCode}
+                        <Badge variant={r.status === '200' || r.status === '201' || r.status === '202' ? 'ok' : 'risk'} className="text-[10px]">
+                          {r.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{r.recordsReturned}</TableCell>
-                      <TableCell className="text-xs text-rose-900">{r.notes}</TableCell>
+                      <TableCell className="font-mono text-[11px] text-slate-600">
+                        {r.ts ? new Date(r.ts).toLocaleString() : 'N/A'}
+                      </TableCell>
                     </TableRow>
                   ))}
+
+                  {/* Fallback Seed Forensic Logs */}
+                  {liveActivity.length === 0 &&
+                    FORENSIC_API_LOGS.slice(0, 5).map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-bold text-xs">LedgerOne</TableCell>
+                        <TableCell><code>{r.apiKeyId}</code></TableCell>
+                        <TableCell className="font-mono text-xs">{r.method}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.endpoint}</TableCell>
+                        <TableCell><Badge variant="ok" className="text-[10px]">{r.statusCode}</Badge></TableCell>
+                        <TableCell className="font-mono text-xs">{r.timestampUtc}</TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -769,7 +970,7 @@ export function TallyBridgeView({
         isOpen={isAddKeyOpen}
         onClose={() => setIsAddKeyOpen(false)}
         title="Provision Integration API Key"
-        description="Configure access scopes and security controls for new machine tokens."
+        description="Configure access scopes and security controls for new machine tokens via API."
       >
         <form onSubmit={handleCreateKey} className="space-y-4">
           <div className="space-y-1.5">
@@ -809,7 +1010,7 @@ export function TallyBridgeView({
             />
           </div>
           <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs">
-            Provision Key
+            Provision Key via API
           </Button>
         </form>
       </Dialog>

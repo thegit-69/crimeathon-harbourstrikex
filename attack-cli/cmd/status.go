@@ -98,11 +98,11 @@ var statusCmd = &cobra.Command{
 			{"hso tamper", "Phase 6", "LedgerOne", "Silent Vendor Bank Tampering (V-0412 Climax)"},
 			{"hso verify-run", "Phase 7", "LedgerOne", "Disbursement Queue Lock-in Verification (Sept 8)"},
 			{"hso auth-test", "Phase 8", "SSO / Kiosk", "Orphaned Account (r.menon) & MFA Bypass"},
+			{"hso anti-forensics", "Evasion", "Anti-Forensics", "Purge Export Job Records & Audit Evasion (T1070)"},
 			{"hso campaign run", "Engine", "End-to-End", "Execute Full 8-Phase Automated Attack Campaign"},
 			{"hso campaign plan", "Blueprint", "Architecture", "Display Intrusion Kill-Chain Graph"},
 			{"hso evidence list", "Forensics", "E01 - E20", "Case Evidence Browser & Timestamp Normalizer"},
 			{"hso report", "Report", "Compliance", "Generate Full MITRE ATT&CK Technical Report"},
-			{"hso server start", "Lab Target", "In-Memory", "Spawn Built-in Synthetic Enterprise Server"},
 		}
 
 		fmt.Println()

@@ -32,7 +32,7 @@ across the Private Link tunnel (10.20.4.0/24), inspecting upcoming payment runs 
 
 		utils.PrintInfo("Tunnel Route    : Private Link Network (10.20.4.0/24)")
 		utils.PrintInfo("Rogue Host      : 10.20.4.77 (tb-build-02 Rogue Build Server)")
-		utils.PrintInfo("Target API      : /v2/payments/search?q=upcoming (LedgerOne Internal)")
+		utils.PrintInfo("Target API      : /api/v2/payments/search?vendor_id=V-0412")
 		fmt.Println()
 
 		data, err := cli.PivotTunnel()
@@ -41,7 +41,7 @@ across the Private Link tunnel (10.20.4.0/24), inspecting upcoming payment runs 
 			return
 		}
 
-		utils.PrintSuccess("TUNNEL PIVOT ESTABLISHED: Rogue build server extracted 22.2 MB from internal financial production!")
+		utils.PrintSuccess("TUNNEL PIVOT ESTABLISHED: Rogue build server accessed live payment and network-flow records!")
 
 		// Pro Cyber HUD Card
 		cardLines := []string{

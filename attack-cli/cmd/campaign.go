@@ -15,6 +15,24 @@ var (
 	runAllPhases   bool
 )
 
+func resolveCampaignPhases(allFlagChanged bool, allFlag bool, selection string) []int {
+	if (allFlagChanged && allFlag) || selection == "all" {
+		return []int{1, 2, 3, 4, 5, 6, 7, 8}
+	}
+	if selection == "" {
+		return []int{1, 2, 3, 4, 5, 6, 7, 8}
+	}
+
+	phases := make([]int, 0)
+	for _, value := range strings.Split(selection, ",") {
+		value = strings.TrimSpace(value)
+		if phase, err := strconv.Atoi(value); err == nil && phase >= 1 && phase <= 8 {
+			phases = append(phases, phase)
+		}
+	}
+	return phases
+}
+
 var campaignCmd = &cobra.Command{
 	Use:   "campaign",
 	Short: "Orchestrate multi-phase offensive security validation campaigns",
@@ -29,18 +47,11 @@ var campaignRunCmd = &cobra.Command{
 		cli := GetClient()
 		eng := engine.NewCampaignEngine(cli)
 
-		var phasesToRun []int
-		if runAllPhases || campaignPhases == "all" || campaignPhases == "" {
-			phasesToRun = []int{1, 2, 3, 4, 5, 6, 7, 8}
-		} else {
-			parts := strings.Split(campaignPhases, ",")
-			for _, p := range parts {
-				p = strings.TrimSpace(p)
-				if val, err := strconv.Atoi(p); err == nil && val >= 1 && val <= 8 {
-					phasesToRun = append(phasesToRun, val)
-				}
-			}
-		}
+		phasesToRun := resolveCampaignPhases(
+			cmd.Flags().Changed("all"),
+			runAllPhases,
+			campaignPhases,
+		)
 
 		summary, err := eng.RunCampaign(phasesToRun)
 		if err != nil {
@@ -99,7 +110,7 @@ var campaignRunCmd = &cobra.Command{
 			fmt.Sprintf(" Target Organization : %sHarbor & Finch Freight Pvt. Ltd. (Case CR-26-047)%s", white, reset),
 			fmt.Sprintf(" Root Vulnerability  : %sUnrestricted, infinite-lifetime machine keys (key-tb-07)%s", yellow, reset),
 			fmt.Sprintf(" Direct Compromise   : %sSilent bank modification of Coastal Packaging Ltd (V-0412)%s", pink, reset),
-			fmt.Sprintf(" Imminent Fraud Loss : %sINR 1,845,000.00%s %s(Disbursement queued for September 8, 2026)%s", red+white, reset, gray, reset),
+			fmt.Sprintf(" Imminent Fraud Loss : %sINR 248,000.00%s %s(Invoice INV-9081 queued for September 8, 2026)%s", red+white, reset, gray, reset),
 			fmt.Sprintf(" Audit Defect        : %sAll 7 internal audit findings (IA-2025-09) left 100%% OPEN!%s", gray, reset),
 		}
 		utils.DrawBox("🚨 FORENSIC THREAT ASSESSMENT", threatLines, red, scoreWidth)
@@ -154,8 +165,8 @@ var campaignPlanCmd = &cobra.Command{
 }
 
 func init() {
-	campaignRunCmd.Flags().StringVarP(&campaignPhases, "phases", "p", "all", "Comma-separated phases to run (e.g. '1,2,6' or 'all')")
-	campaignRunCmd.Flags().BoolVarP(&runAllPhases, "all", "a", true, "Execute all 8 kill-chain phases")
+	campaignRunCmd.Flags().StringVarP(&campaignPhases, "phases", "p", "", "Comma-separated phases to run (e.g. '1,2,6' or 'all')")
+	campaignRunCmd.Flags().BoolVarP(&runAllPhases, "all", "a", false, "Execute all 8 kill-chain phases")
 	campaignCmd.AddCommand(campaignRunCmd)
 	campaignCmd.AddCommand(campaignPlanCmd)
 	rootCmd.AddCommand(campaignCmd)

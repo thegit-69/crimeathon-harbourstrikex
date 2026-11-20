@@ -109,7 +109,7 @@ var evidenceTimelineCmd = &cobra.Command{
 			{"2026-08-12 03:41 UTC (09:11 IST)", "VENDOR EXFIL", green, "Finance API (E01)", "Attacker downloads 9,840 vendor master records via req-c35c2ccaff", "Baseline vendor list and payout schedules exfiltrated"},
 			{"2026-08-14 to 16", "STORAGE THEFT", pink, "Cloud Store (E05)", "Weaponized bvk-7f3a used to steal vendor-bank-details-2026.xlsx", "All 300 haulier & vendor banking coordinates exfiltrated"},
 			{"2026-08-17 to 19", "TUNNEL PIVOT", cyan, "Private Link (E15)", "tb-build-02 (10.20.4.77) pulls 22.2MB payment data across tunnel", "Early morning dispatch dashboard sluggishness noticed (Note 94)"},
-			{"2026-09-03 01:44 UTC (07:14 IST)", "SILENT TAMPER", red, "Finance API (E18/E19)", "PATCH /v2/vendors/V-0412/bank-details changes account to ****9083", "Approval Ref was BLANK! Diverts INR 1,845,000 to mule route"},
+			{"2026-09-03 01:44 UTC (07:14 IST)", "SILENT TAMPER", red, "Finance API (E18/E19)", "PATCH /v2/vendors/V-0412/bank-details changes account to ****9083", "Approval Ref was BLANK! Diverts INR 248,000 to mule route (INV-9081)"},
 			{"2026-09-06 01:36 UTC (07:06 IST)", "LOCK-IN CHECK", green, "Finance API (E18)", "GET /v2/payments/scheduled confirms tampered account queued for run", "Payment scheduled for fund disbursement on September 8!"},
 			{"2026-09-07", "COMMISSION", yellow, "General Manager", "Dev Raghavan commissions emergency cybersecurity investigation", "Last line of defense before funds release on September 8!"},
 		}

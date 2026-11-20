@@ -50,7 +50,7 @@ func generateTextReport() {
 		fmt.Sprintf("    • Organization  : %sHarbor & Finch Freight Pvt. Ltd. (Chennai Hub)%s", white, reset),
 		fmt.Sprintf("    • Incident Type : %sSupply-Chain Integration Abuse & Silent Payment Fraud%s", pink, reset),
 		fmt.Sprintf("    • Direct Target : %sCoastal Packaging Ltd (Vendor V-0412)%s", cyan, reset),
-		fmt.Sprintf("    • At-Risk Funds : %sINR 1,845,000.00%s %s(Scheduled Run: 08 Sep 2026)%s", red, reset, gray, reset),
+		fmt.Sprintf("    • At-Risk Funds : %sINR 248,000.00%s %s(Scheduled Run: 08 Sep 2026)%s", red, reset, gray, reset),
 		"",
 		fmt.Sprintf(" %s2. TESTED KILL-CHAIN & MITRE ATT&CK VALIDATION%s", yellow, reset),
 		fmt.Sprintf("    • %sT1199%s Trusted Relationship  : %sRogue host 10.20.4.77 on private tunnel%s", cyan, reset, green, reset),
@@ -96,14 +96,14 @@ The threat actor leveraged over-privileged, unrotated machine identities (key-tb
 
 | Phase | Vector / Endpoint | Identity Used | Source IP | Exploit Verdict |
 | :---: | :--- | :--- | :--- | :---: |
-| **1** | Recon: GET /v2/me | key-tb-07 | 198.18.7.41 | **VULNERABLE** |
-| **2** | Ticket Theft: POST /api/v1/exports/bulk | tb-sync-svc | 198.18.7.41 | **VULNERABLE** |
-| **3** | Storage Exfil: GET /storage/files | bvk-7f3a | 198.18.7.23 | **VULNERABLE** |
-| **4** | Vendor Catalog Exfil: POST /v2/vendors/export | key-tb-07 | 198.18.7.58 | **VULNERABLE** |
-| **5** | Tunnel Pivot: GET /v2/payments/search | tb-build-02 | 10.20.4.77 | **VULNERABLE** |
-| **6** | Bank Tampering: PATCH /v2/vendors/V-0412 | key-tb-07 | 10.20.4.77 | **CRITICAL EXPLOIT** |
-| **7** | Lock-In Verification: GET /v2/payments/scheduled | key-tb-07 | 10.20.4.77 | **CONFIRMED** |
-| **8** | Orphaned SSO Login: POST /sso/login | r.menon | dev-81546 | **VULNERABLE** |
+| **1** | Recon: GET /api/v2/me | key-tb-07 | 198.18.7.41 | **LIVE VERIFIED** |
+| **2** | Ticket Theft: POST /api/v1/support/exports | tb-sync-svc | 198.18.7.41 | **LIVE VERIFIED** |
+| **3** | Storage Exfil: GET /api/storage/list and /api/storage/read | bvk-7f3a | 198.18.7.23 | **LIVE VERIFIED** |
+| **4** | Vendor Catalog Exfil: GET /api/v2/vendors/export | key-tb-07 | 198.18.7.58 | **LIVE VERIFIED** |
+| **5** | Tunnel Pivot: GET /api/v2/payments/search and /api/integration/network-flows | tb-build-02 | 10.20.4.77 | **LIVE VERIFIED** |
+| **6** | Bank Tampering: PATCH /api/v2/vendors/V-0412/bank-details | key-tb-07 | 10.20.4.77 | **LIVE VERIFIED** |
+| **7** | Lock-In Verification: GET /api/v2/payments/scheduled | key-tb-07 | 10.20.4.77 | **LIVE VERIFIED** |
+| **8** | Orphaned Login: POST /auth/login | r.menon | dev-81546 | **LIVE VERIFIED** |
 
 ---
 
@@ -113,7 +113,7 @@ On **03 September 2026 at 01:44:30 UTC (07:14:30 IST)**:
 - **Original Bank Account:** HDFC0001842-4417
 - **Tampered Bank Account:** HDFC0001842-9083 (Attacker Mule Account)
 - **Approval Reference:** BLANK (Zero dual-approval or human review enforced)
-- **Imminent Financial Loss:** INR 1,845,000 scheduled for disbursement on September 8!
+- **Imminent Financial Loss:** INR 248,000 scheduled for disbursement on September 8 (Invoice INV-9081)!
 `
 	if reportOutput != "" {
 		if err := os.WriteFile(reportOutput, []byte(md), 0644); err != nil {
@@ -128,18 +128,19 @@ On **03 September 2026 at 01:44:30 UTC (07:14:30 IST)**:
 
 func generateJSONReport() {
 	data := map[string]interface{}{
-		"case_id":        "CR-26-047",
-		"target_company": "Harbor & Finch Freight Pvt. Ltd.",
-		"overall_status": "VULNERABLE",
-		"kill_chain_steps_tested": 8,
-		"successful_exploits":     8,
+		"case_id":                      "CR-26-047",
+		"target_company":               "Harbor & Finch Freight Pvt. Ltd.",
+		"overall_status":               "VULNERABLE",
+		"kill_chain_steps_implemented": 8,
+		"live_verification":            "Individual live commands verified against the Docker FastAPI backend; campaign-wide historical results are not persisted.",
+		"successful_exploits":          0,
 		"critical_exploit": map[string]interface{}{
 			"phase":           6,
 			"target_vendor":   "V-0412 (Coastal Packaging Ltd)",
 			"tampered_field":  "bank_account",
 			"original_value":  "HDFC0001842-4417",
 			"tampered_value":  "HDFC0001842-9083",
-			"financial_risk":  "INR 1,845,000.00",
+			"financial_risk":  "INR 248,000.00",
 			"disbursement_dt": "2026-09-08",
 		},
 	}

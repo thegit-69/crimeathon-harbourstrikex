@@ -311,7 +311,7 @@ func DrawDiffCard(vendor, oldVal, newVal, modifiedBy, approvalRef string) {
 	width := 74
 
 	line1 := fmt.Sprintf(" Target Vendor   : %s%s%s", white, vendor, reset)
-	line2 := fmt.Sprintf(" Disbursement    : %sINR 1,845,000.00%s %s(Scheduled Run: 08 Sept 2026)%s", yellow, reset, gray, reset)
+	line2 := fmt.Sprintf(" Disbursement    : %sINR 248,000.00%s %s(Scheduled Run: 08 Sept 2026, Invoice INV-9081)%s", yellow, reset, gray, reset)
 	line3 := fmt.Sprintf(" [-] ORIGINAL    : %s%s%s  %s[GENUINE]%s", green, oldVal, reset, green, reset)
 	line4 := fmt.Sprintf(" [+] TAMPERED    : %s%s%s  %s[MULE ACCOUNT]%s", red, newVal, reset, red, reset)
 	line5 := fmt.Sprintf(" Changed By      : %s%s%s", yellow, modifiedBy, reset)
