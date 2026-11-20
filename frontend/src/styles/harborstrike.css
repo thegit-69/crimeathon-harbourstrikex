@@ -928,29 +928,8 @@ tr:last-child td {
 }
 
 /* ================= DASHBOARD THEMES ================= */
-/* HelpDeskr — confident cobalt, fresh teal, warm coral */
+/* HelpDeskr — deeper forest green, jade and antique gold */
 #app[data-theme="help"] {
-  --w-bg: #e5edf8;
-  --w-side: #d7e3f4;
-  --w-panel: #f7f9fd;
-  --w-panel-alt: #e7eef8;
-  --w-line: #c5d4e9;
-  --w-text: #1e3450;
-  --w-muted: #526b87;
-  --w-primary: #355bc4;
-  --w-secondary: #087f7b;
-  --w-tertiary: #cf6c4e;
-  --w-primary-soft: #dce6ff;
-  --w-secondary-soft: #d5eeeb;
-  --w-tertiary-soft: #f8e5dc;
-  --w-primary-ink: #28499f;
-  --w-secondary-ink: #075f5c;
-  --w-tertiary-ink: #93452f;
-  --w-hover: #dce7f6;
-}
-
-/* BlueVault — deeper forest green, jade and antique gold */
-#app[data-theme="blue"] {
   --w-bg: #e5f0e8;
   --w-side: #d6e8dc;
   --w-panel: #f8fbf8;
@@ -968,6 +947,27 @@ tr:last-child td {
   --w-secondary-ink: #226c56;
   --w-tertiary-ink: #705713;
   --w-hover: #dcece1;
+}
+
+/* BlueVault — confident cobalt, fresh teal, warm coral */
+#app[data-theme="blue"] {
+  --w-bg: #e5edf8;
+  --w-side: #d7e3f4;
+  --w-panel: #f7f9fd;
+  --w-panel-alt: #e7eef8;
+  --w-line: #c5d4e9;
+  --w-text: #1e3450;
+  --w-muted: #526b87;
+  --w-primary: #355bc4;
+  --w-secondary: #087f7b;
+  --w-tertiary: #cf6c4e;
+  --w-primary-soft: #dce6ff;
+  --w-secondary-soft: #d5eeeb;
+  --w-tertiary-soft: #f8e5dc;
+  --w-primary-ink: #28499f;
+  --w-secondary-ink: #075f5c;
+  --w-tertiary-ink: #93452f;
+  --w-hover: #dce7f6;
 }
 
 /* LedgerOne — ink navy, richer gold and muted terracotta */
@@ -1089,5 +1089,266 @@ tr:last-child td {
   }
   #app .top .top-brand .slash {
     display: none;
+  }
+}
+
+/* ================= EXPLOIT WORKSPACE CONTROLS ================= */
+.exploit-section-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+  padding-top: 4px;
+}
+
+.exploit-section-bar label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+  user-select: none;
+  line-height: 1;
+}
+
+.exploit-section-select-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .exploit-section-select-wrapper {
+    width: 380px;
+  }
+}
+
+.exploit-section-select {
+  width: 100% !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 40px 0 14px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 36px !important;
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  outline: none !important;
+  cursor: pointer !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  box-sizing: border-box !important;
+  display: block !important;
+}
+
+.exploit-section-select:hover {
+  border-color: #94a3b8 !important;
+}
+
+.exploit-section-select:focus {
+  border-color: #0f172a !important;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.15) !important;
+}
+
+.exploit-section-select option {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #0f172a;
+  background-color: #ffffff;
+}
+
+.exploit-section-chevron {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+  pointer-events: none;
+}
+
+/* Scoped search inputs for Footprint and Evidence Reference */
+.exploit-search-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .exploit-search-wrapper {
+    width: 300px;
+  }
+}
+
+.exploit-search-input {
+  width: 100% !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 0 14px 0 38px !important;
+  font-size: 12px !important;
+  line-height: 36px !important;
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  display: block !important;
+}
+
+.exploit-search-input::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+  font-size: 12px !important;
+  line-height: 36px !important;
+}
+
+.exploit-search-input:focus {
+  border-color: #0f172a !important;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.15) !important;
+}
+
+.exploit-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+/* ================= HELPDESKR SEARCH BAR ================= */
+.helpdeskr-search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .helpdeskr-search-wrapper {
+    width: 240px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .helpdeskr-search-wrapper {
+    width: 260px;
+  }
+}
+
+.helpdeskr-search-input {
+  width: 100% !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 12px 0 36px !important;
+  font-size: 12px !important;
+  line-height: 34px !important;
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  display: block !important;
+}
+
+.helpdeskr-search-input::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+  font-size: 12px !important;
+  line-height: 34px !important;
+}
+
+.helpdeskr-search-input:focus {
+  border-color: #0f172a !important;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.15) !important;
+}
+
+.helpdeskr-search-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+/* ================= PRINT STYLES ================= */
+@media print {
+  /* Hide application shell, sidebar, top header, toast, navigation and buttons */
+  #app .side,
+  #app .top,
+  #app .toast,
+  .no-print,
+  button,
+  select,
+  input {
+    display: none !important;
+  }
+
+  /* Reset main layout for full-width print */
+  html, body, #app, #app main, #app .content, #view {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 14mm 12mm 14mm 12mm;
+  }
+
+  .report-document {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #0f172a !important;
+  }
+
+  /* Table print optimization */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-break-before {
+    page-break-before: always !important;
+    break-before: always !important;
   }
 }
