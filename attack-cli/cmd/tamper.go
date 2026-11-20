@@ -18,7 +18,7 @@ var tamperCmd = &cobra.Command{
 	Use:   "tamper",
 	Short: "Phase 6: Silent Fraudulent Vendor Bank Account Tampering",
 	Long: `Phase 6: Silent Fraudulent Vendor Bank Account Tampering
-Executes the critical fraud payload: PATCH /v2/vendors/{id}/bank-details via machine key key-tb-07
+Executes the critical fraud payload: PATCH /api/v2/vendors/{id}/bank-details via machine key key-tb-07
 from rogue host 10.20.4.77, silently altering the disbursement routing to an attacker mule account.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		utils.PrintBreadcrumb("HARBORSTRIKE-X", "PHASE 6", "SILENT FRAUDULENT BANK TAMPERING [CLIMAX]")
@@ -60,7 +60,7 @@ from rogue host 10.20.4.77, silently altering the disbursement routing to an att
 		evidenceLines := []string{
 			fmt.Sprintf(" Case Evidence : %sE18 (req-5f61b0de8 on 03 Sep), E19 (chg-8b9888c39b with blank approval)%s", white, reset),
 			fmt.Sprintf(" MITRE ATT&CK  : %sT1565.001 (Stored Data Manipulation) │ T1078 (Valid Accounts)%s", pink, reset),
-			fmt.Sprintf(" Financial Risk: %sINR 1,845,000 scheduled for disbursement on September 8, 2026%s", red, reset),
+			fmt.Sprintf(" Financial Risk: %sINR 248,000 scheduled for disbursement on September 8, 2026 (Invoice INV-9081)%s", red, reset),
 		}
 		utils.DrawBox("🔍 FORENSIC EVIDENCE & MITRE ATT&CK CORRELATION", evidenceLines, purple, 80)
 

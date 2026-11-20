@@ -29,9 +29,9 @@ enumerate documents in /finance, and exfiltrate master bank details and financia
 		gray := utils.ColorSlate
 		reset := utils.ColorReset
 
-		utils.PrintInfo("Target Storage  : BlueVault Object Storage (/storage/files)")
+		utils.PrintInfo("Target Storage  : BlueVault Object Storage (/api/storage/list, /api/storage/read)")
 		utils.PrintInfo("Key Weaponized  : %s (Harvested from TKT-48213)", storageKey)
-		utils.PrintInfo("Origin Ingress  : 198.18.7.23 (Adversary Staging Host)",)
+		utils.PrintInfo("Origin Ingress  : 198.18.7.23 (Adversary Staging Host)")
 		fmt.Println()
 
 		data, err := cli.AccessStorage()
@@ -46,8 +46,8 @@ enumerate documents in /finance, and exfiltrate master bank details and financia
 		cardLines := []string{
 			fmt.Sprintf(" Storage Vault     : %s%v%s  %s[ACCESS GRANTED]%s", white, data["bucket"], reset, green, reset),
 			fmt.Sprintf(" Weaponized Key    : %s%v%s (Unrotated since 2024 - Risk R-029)", yellow, data["key_id"], reset),
-			fmt.Sprintf(" Stolen Master File: %svendor-bank-details-2026.xlsx (4.28 MB, 300 Vendors)%s", red, reset),
-			fmt.Sprintf(" Exfiltrated Docs  : %s40 financial statement records (stmt-2026-01 to 05.pdf)%s", cyan, reset),
+			fmt.Sprintf(" Listed/Read Files : %s%v live BlueVault document(s)%s", red, data["files_stolen"], reset),
+			fmt.Sprintf(" Artifact Paths    : %s%v%s", cyan, data["key_artifacts"], reset),
 			fmt.Sprintf(" Ingress Route     : %s198.18.7.23 (External Adversary Infrastructure via E20)%s", yellow, reset),
 			fmt.Sprintf(" Exploit Verdict   : %s[✔ EXPLOITED: ALL 300 VENDOR BANK COORDINATES COMPROMISED]%s", green, reset),
 		}

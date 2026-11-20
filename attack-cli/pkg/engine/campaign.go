@@ -96,6 +96,11 @@ func (e *CampaignEngine) executePhase1() (*models.AttackStepResult, error) {
 		return nil, err
 	}
 
+	permissions := data["permissions"]
+	if permissions == nil {
+		permissions = data["scope"]
+	}
+
 	return &models.AttackStepResult{
 		Phase:          1,
 		Name:           "API Reconnaissance & Key Exposure",
@@ -107,7 +112,7 @@ func (e *CampaignEngine) executePhase1() (*models.AttackStepResult, error) {
 		Status:         "EXPLOITED",
 		EvidenceRef:    "E01 (req-c28d87e49d), E04 (Software Register)",
 		MITRETechnique: "T1592 / T1078",
-		Details:        fmt.Sprintf("Discovered unconstrained key permissions: %v. No IP restriction configured; infinite validity.", data["permissions"]),
+		Details:        fmt.Sprintf("Discovered key scope: %v. Confirmed the Docker backend returned the real /api/v2/me and /api/v2/schema responses.", permissions),
 	}, nil
 }
 
