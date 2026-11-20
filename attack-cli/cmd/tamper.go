@@ -48,11 +48,26 @@ from rogue host 10.20.4.77, silently altering the disbursement routing to an att
 		utils.PrintSuccess("EXPLOIT EXECUTED: Vendor disbursement destination altered to mule account!")
 
 		// Linux-style clean diff card
-		oldAcc := "****4417"
-		newAcc := "****9083"
-		vendorTitle := "V-0412 - Coastal Packaging Ltd"
+		oldAcc, _ := data["old_bank_account"].(string)
+		if oldAcc == "" {
+			oldAcc = "****4417"
+		}
+		newAcc, _ := data["new_bank_account"].(string)
+		if newAcc == "" {
+			newAcc = fraudAccount
+		}
+		vendorName, _ := data["vendor_name"].(string)
+		if vendorName == "" {
+			vendorName = "Coastal Packaging Ltd"
+		}
+		vendorTitle := fmt.Sprintf("%s - %s", targetVendorID, vendorName)
 		modifiedBy := "Machine key (redacted) from 10.20.4.77"
 		approvalRef := "BLANK / NULL (Zero Dual-Approval Enforced!)"
+		if _, ok := data["approval_ref"]; ok {
+			if ref, ok := data["approval_ref"].(string); ok && ref != "" {
+				approvalRef = ref
+			}
+		}
 
 		utils.DrawDiffCard(vendorTitle, oldAcc, newAcc, modifiedBy, approvalRef)
 
