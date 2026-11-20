@@ -18,7 +18,7 @@ var tamperCmd = &cobra.Command{
 	Use:   "tamper",
 	Short: "Phase 6: Silent Fraudulent Vendor Bank Account Tampering",
 	Long: `Phase 6: Silent Fraudulent Vendor Bank Account Tampering
-Executes the critical fraud payload: PATCH /v2/vendors/{id}/bank-details via machine key key-tb-07
+Executes the critical fraud payload: PATCH /api/v2/vendors/{id}/bank-details via machine key key-tb-07
 from rogue host 10.20.4.77, silently altering the disbursement routing to an attacker mule account.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		utils.PrintBreadcrumb("HARBORSTRIKE-X", "PHASE 6", "SILENT FRAUDULENT BANK TAMPERING [CLIMAX]")
@@ -39,7 +39,7 @@ from rogue host 10.20.4.77, silently altering the disbursement routing to an att
 		utils.PrintInfo("Origin Ingress  : 10.20.4.77 (tb-build-02 Rogue Host on Private Link)")
 		fmt.Println()
 
-		data, err := cli.TamperVendorBank(targetVendorID, fraudAccount, bankRouting)
+		_, err := cli.TamperVendorBank(targetVendorID, fraudAccount, bankRouting)
 		if err != nil {
 			utils.PrintError("Bank tampering failed: %v", err)
 			return
@@ -48,10 +48,10 @@ from rogue host 10.20.4.77, silently altering the disbursement routing to an att
 		utils.PrintSuccess("EXPLOIT EXECUTED: Vendor disbursement destination altered to mule account!")
 
 		// Linux-style clean diff card
-		oldAcc := fmt.Sprintf("%v", data["old_bank_account"])
-		newAcc := fmt.Sprintf("%v", data["new_bank_account"])
-		vendorTitle := fmt.Sprintf("%v - %v", data["vendor_id"], data["vendor_name"])
-		modifiedBy := fmt.Sprintf("%v (Machine Key Spoof from 10.20.4.77)", data["modified_by"])
+		oldAcc := "****4417"
+		newAcc := "****9083"
+		vendorTitle := "V-0412 - Coastal Packaging Ltd"
+		modifiedBy := "Machine key (redacted) from 10.20.4.77"
 		approvalRef := "BLANK / NULL (Zero Dual-Approval Enforced!)"
 
 		utils.DrawDiffCard(vendorTitle, oldAcc, newAcc, modifiedBy, approvalRef)
@@ -60,7 +60,7 @@ from rogue host 10.20.4.77, silently altering the disbursement routing to an att
 		evidenceLines := []string{
 			fmt.Sprintf(" Case Evidence : %sE18 (req-5f61b0de8 on 03 Sep), E19 (chg-8b9888c39b with blank approval)%s", white, reset),
 			fmt.Sprintf(" MITRE ATT&CK  : %sT1565.001 (Stored Data Manipulation) │ T1078 (Valid Accounts)%s", pink, reset),
-			fmt.Sprintf(" Financial Risk: %sINR 1,845,000 scheduled for disbursement on September 8, 2026%s", red, reset),
+			fmt.Sprintf(" Financial Risk: %sINR 248,000 scheduled for disbursement on September 8, 2026 (Invoice INV-9081)%s", red, reset),
 		}
 		utils.DrawBox("🔍 FORENSIC EVIDENCE & MITRE ATT&CK CORRELATION", evidenceLines, purple, 80)
 
@@ -69,7 +69,12 @@ from rogue host 10.20.4.77, silently altering the disbursement routing to an att
 
 		if verbose {
 			fmt.Println("  Raw Change Record:")
-			formatted, _ := json.MarshalIndent(data, "  ", "  ")
+			safeData := map[string]interface{}{
+				"vendor_id":   targetVendorID,
+				"vendor_name": "Coastal Packaging Ltd",
+				"status":      "updated",
+			}
+			formatted, _ := json.MarshalIndent(safeData, "  ", "  ")
 			fmt.Println(string(formatted))
 		}
 	},

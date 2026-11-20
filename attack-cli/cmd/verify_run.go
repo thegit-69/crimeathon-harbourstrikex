@@ -12,7 +12,7 @@ var verifyRunCmd = &cobra.Command{
 	Use:   "verify-run",
 	Short: "Phase 7: Disbursement Verification & Pre-Execution Gate",
 	Long: `Phase 7: Disbursement Verification & Pre-Execution Gate
-Queries GET /v2/payments/scheduled to verify that the fraudulent bank account
+Queries GET /api/v2/payments/scheduled to verify that the fraudulent bank account
 is locked into the automated payment run scheduled for September 8, 2026.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		utils.PrintBreadcrumb("HARBORSTRIKE-X", "PHASE 7", "DISBURSEMENT PRE-EXECUTION VERIFICATION")
@@ -29,7 +29,7 @@ is locked into the automated payment run scheduled for September 8, 2026.`,
 		gray := utils.ColorSlate
 		reset := utils.ColorReset
 
-		utils.PrintInfo("Target System   : LedgerOne Production (/v2/payments/scheduled)")
+		utils.PrintInfo("Target System   : LedgerOne Production (/api/v2/payments/scheduled)")
 		utils.PrintInfo("Query Batch     : 2026-09-08 Automated Disbursement Run")
 		utils.PrintInfo("Origin Route    : 10.20.4.77 (Private Link tb-build-02)")
 		fmt.Println()
@@ -46,7 +46,7 @@ is locked into the automated payment run scheduled for September 8, 2026.`,
 		cardLines := []string{
 			fmt.Sprintf(" Disbursement Batch : %s%v%s  %s[SCHEDULED RUN: 08 SEPT 2026]%s", white, data["disbursement_run"], reset, yellow, reset),
 			fmt.Sprintf(" Target Vendor      : %sV-0412 - Coastal Packaging Ltd%s", cyan, reset),
-			fmt.Sprintf(" At-Risk Funds      : %sINR 1,845,000.00%s", red, reset),
+			fmt.Sprintf(" At-Risk Funds      : %sINR 248,000.00%s (Invoice INV-9081)", red, reset),
 			fmt.Sprintf(" Locked Destination : %sHDFC0001842-9083%s  %s[MULE ACCOUNT ARMED]%s", red, reset, red, reset),
 			fmt.Sprintf(" Queue Status       : %sPENDING_DISBURSEMENT (Automated Transfer Ready)%s", yellow, reset),
 			fmt.Sprintf(" Exploit Verdict    : %s[✔ EXPLOITED: FRAUDULENT PAYOUT ROUTED & LOCKED IN]%s", green, reset),

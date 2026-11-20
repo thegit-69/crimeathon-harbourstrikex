@@ -117,6 +117,12 @@ Present each attack phase individually to the evaluators. Each command prints ri
 # Evidence: E04, E16 | MITRE: T1078.002
 .\dist\hso.exe auth-test
 
+# Step 8 (Variant): Validate Admin Password Spray Probe
+.\dist\hso.exe auth-test --user a.kapoor
+
+# Step 9: Post-Exfil Anti-Forensics & Trace Elimination (T1070)
+.\dist\hso.exe anti-forensics
+
 # Step 9: Generate Executive Validation & MITRE ATT&CK Technical Report
 .\dist\hso.exe report
 

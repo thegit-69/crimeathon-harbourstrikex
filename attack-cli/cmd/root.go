@@ -105,13 +105,13 @@ func renderRootDashboard() {
 	fmt.Println()
 	tools := [][]string{
 		{"hso campaign run", "Engine", "Run automated 8-phase attack with scorecard"},
+		{"hso anti-forensics", "Evasion", "Simulate trace deletion & HelpDeskr timeout trap"},
 		{"hso campaign plan", "Blueprint", "Display intrusion kill-chain ASCII graph"},
 		{"hso ui", "Workbench", "Launch multi-pane Posting-inspired terminal interface"},
 		{"hso evidence list", "Forensics", "Browse 20 case evidence artifacts (E01-E20)"},
 		{"hso evidence inspect", "Forensics", "Deep-dive into specific evidence findings (e.g. E18)"},
 		{"hso evidence timeline", "Forensics", "Cross-system timeline with UTC/IST normalization"},
 		{"hso report", "Compliance", "Generate full MITRE ATT&CK validation report"},
-		{"hso server start", "Lab Target", "Spawn synthetic enterprise HTTP server on :8080"},
 	}
 	for _, t := range tools {
 		fmt.Printf("  %s%-23s%s  %s%-12s%s  %s%s%s\n",
@@ -139,12 +139,12 @@ func Execute() {
 
 func init() {
 	// Global persistent flags
-	rootCmd.PersistentFlags().StringVarP(&targetBaseURL, "target-url", "u", "http://localhost:8080", "Target base URL of synthetic enterprise backend")
+	rootCmd.PersistentFlags().StringVarP(&targetBaseURL, "target-url", "u", "http://localhost:8000", "Target base URL of synthetic enterprise backend")
 	rootCmd.PersistentFlags().StringVarP(&apiKey, "api-key", "k", "key-tb-07", "Machine API key for LedgerOne finance system")
 	rootCmd.PersistentFlags().StringVar(&storageKey, "storage-key", "bvk-7f3a", "Discovered BlueVault object storage key")
 	rootCmd.PersistentFlags().StringVar(&ticketToken, "ticket-token", "tb-sync-svc", "Support SaaS sync token for HelpDeskr")
 	rootCmd.PersistentFlags().StringVarP(&sourceIP, "source-ip", "s", "198.18.7.41", "Simulated source IP address (e.g., 198.18.7.41 or 10.20.4.77)")
-	rootCmd.PersistentFlags().StringVarP(&executionMode, "mode", "m", "simulate", "Execution mode: 'live' (HTTP requests) or 'simulate' (offline engine)")
+	rootCmd.PersistentFlags().StringVarP(&executionMode, "mode", "m", "live", "Execution mode: 'live' (FastAPI Docker backend) or 'simulate' (offline demo)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output and telemetry")
 
 	// Custom Help Template for aesthetic, modern CLI presentation

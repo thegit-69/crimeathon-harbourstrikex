@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: harbourstrikex-db
+    environment:
+      POSTGRES_USER: hsuser
+      POSTGRES_PASSWORD: hspassword
+      POSTGRES_DB: harbourstrikex
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U hsuser -d harbourstrikex" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - hs-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: harbourstrikex-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://hsuser:hspassword@db:5432/harbourstrikex
+      CORS_ORIGINS: http://localhost:5173,http://localhost:4173
+      JWT_SECRET_KEY: harbourstrikex-dev-secret-change-in-prod
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: 60
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - hs-network
+
+volumes:
+  pgdata:
+
+networks:
+  hs-network:
+    driver: bridge

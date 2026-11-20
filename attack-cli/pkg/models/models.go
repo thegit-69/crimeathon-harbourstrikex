@@ -109,3 +109,12 @@ type CampaignSummary struct {
 	OverallVerdict string             `json:"overall_verdict"`
 	Steps          []AttackStepResult `json:"steps"`
 }
+
+// AntiForensicsResult records results of evidence cleanup attempts
+type AntiForensicsResult struct {
+	LedgerOneJobDeleted bool   `json:"ledgerone_job_deleted"`
+	LedgerOneMessage    string `json:"ledgerone_message"`
+	HelpDeskrJobDeleted bool   `json:"helpdeskr_job_deleted"`
+	HelpDeskrError      string `json:"helpdeskr_error"`
+	EvidentiaryTrail    string `json:"evidentiary_trail"`
+}

@@ -13,8 +13,8 @@ var vendorExfilCmd = &cobra.Command{
 	Use:   "vendor-exfil",
 	Short: "Phase 4: Bulk Financial Vendor Master Catalog Exfiltration",
 	Long: `Phase 4: Bulk Financial Vendor Master Catalog Exfiltration
-Calls POST /v2/vendors/export on LedgerOne with machine key key-tb-07.
-Downloads 9,840 vendor master records, mapping vendor codes, bank accounts, and payment terms.`,
+Calls GET /api/v2/vendors/export on LedgerOne with machine key key-tb-07.
+Downloads the live vendor master records, mapping vendor codes, bank accounts, and payment terms.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		utils.PrintBreadcrumb("HARBORSTRIKE-X", "PHASE 4", "FINANCIAL VENDOR MASTER EXFILTRATION")
 		utils.PrintHeader("Phase 4: Vendor Master Catalog Exfiltration")
@@ -30,7 +30,7 @@ Downloads 9,840 vendor master records, mapping vendor codes, bank accounts, and 
 		gray := utils.ColorSlate
 		reset := utils.ColorReset
 
-		utils.PrintInfo("Target System   : LedgerOne Production (/v2/vendors/export)")
+		utils.PrintInfo("Target System   : LedgerOne Production (/api/v2/vendors/export)")
 		utils.PrintInfo("Key Weaponized  : %s (TallyBridge Sync Machine Key)", apiKey)
 		utils.PrintInfo("Origin Ingress  : 198.18.7.58 (External Attacker Ingress via E01)")
 		fmt.Println()
@@ -41,11 +41,11 @@ Downloads 9,840 vendor master records, mapping vendor codes, bank accounts, and 
 			return
 		}
 
-		utils.PrintSuccess("EXFIL COMPLETED: Dumped 9,840 vendor master records; prime target Coastal Packaging Ltd identified!")
+		utils.PrintSuccess("EXFIL COMPLETED: Dumped live vendor master records; prime target Coastal Packaging Ltd identified!")
 
 		// Pro Cyber HUD Card
 		cardLines := []string{
-			fmt.Sprintf(" Export Job ID     : %s%v%s  %s[DUMP COMPLETE - 9,840 ROWS]%s", white, data["export_id"], reset, green, reset),
+			fmt.Sprintf(" Export Job ID     : %s%v%s  %s[DUMP COMPLETE - %v ROWS]%s", white, data["export_id"], reset, green, data["total_records"], reset),
 			fmt.Sprintf(" Target Identified : %s%v%s", yellow, data["target_vendor"], reset),
 			fmt.Sprintf(" Genuine Account   : %s%v%s  %s[BASELINE HDFC COORDINATES]%s", cyan, data["legitimate_acc"], reset, green, reset),
 			fmt.Sprintf(" Scheduled Payout  : %s%v%s", red, data["scheduled_payout"], reset),

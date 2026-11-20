@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { TicketRecord } from '../types';
 import { APPS } from '../data/mockData';
 import { EXPORT_JOBS_E02_E06 } from '../data/caseEvidenceData';
+import {
+  helpdeskrApi,
+  converters,
+  type ExportJobDto,
+  type HelpDeskAuditLogDto,
+} from '../services/api';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -28,12 +34,16 @@ import {
   ShieldCheck,
   History,
   MessageSquare,
+  RefreshCw,
+  Trash2,
+  DownloadCloud,
 } from 'lucide-react';
 
 interface HelpDeskrViewProps {
   tickets: TicketRecord[];
   onAddTicket: (ticket: TicketRecord) => void;
   onUpdateTicketStatus: (index: number, newStatus: string) => void;
+  onDeleteTicket?: (ticketId: string) => void;
   showMessage: (msg: string) => void;
 }
 
@@ -41,10 +51,18 @@ export function HelpDeskrView({
   tickets,
   onAddTicket,
   onUpdateTicketStatus,
+  onDeleteTicket,
   showMessage,
 }: HelpDeskrViewProps) {
   const [activeTab, setActiveTab] = useState('tickets');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Live state synchronized with backend
+  const [liveTickets, setLiveTickets] = useState<TicketRecord[]>(tickets);
+  const [liveExports, setLiveExports] = useState<ExportJobDto[]>([]);
+  const [liveAudit, setLiveAudit] = useState<HelpDeskAuditLogDto[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isTriggeringExport, setIsTriggeringExport] = useState(false);
 
   // Modals state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -67,42 +85,175 @@ export function HelpDeskrView({
   const [apiActor, setApiActor] = useState('tb-sync-svc');
   const [apiAccessStatus, setApiAccessStatus] = useState('Enabled');
 
-  const handleCreateTicket = (e: React.FormEvent) => {
+  // Manual DB sync function
+  const loadHelpDeskrData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [tRes, eRes, aRes] = await Promise.allSettled([
+        helpdeskrApi.getTickets(),
+        helpdeskrApi.getExports(),
+        helpdeskrApi.getAuditLog(),
+      ]);
+
+      if (tRes.status === 'fulfilled' && tRes.value.length > 0) {
+        setLiveTickets(tRes.value.map(converters.ticketToRecord));
+      }
+      if (eRes.status === 'fulfilled') {
+        setLiveExports(eRes.value);
+      }
+      if (aRes.status === 'fulfilled') {
+        setLiveAudit(aRes.value);
+      }
+    } catch {
+      // offline fallback keeps local state
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Async data fetch on mount
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled([
+      helpdeskrApi.getTickets(),
+      helpdeskrApi.getExports(),
+      helpdeskrApi.getAuditLog(),
+    ]).then(([tRes, eRes, aRes]) => {
+      if (!active) return;
+      if (tRes.status === 'fulfilled' && tRes.value.length > 0) {
+        setLiveTickets(tRes.value.map(converters.ticketToRecord));
+      }
+      if (eRes.status === 'fulfilled') {
+        setLiveExports(eRes.value);
+      }
+      if (aRes.status === 'fulfilled') {
+        setLiveAudit(aRes.value);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // 1. CREATE TICKET
+  const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createRequester.trim() || !createSubject.trim()) {
       showMessage('Requester and subject are required.');
       return;
     }
-    const newId = `HD-${Math.floor(2050 + Math.random() * 50)}`;
-    onAddTicket([
-      newId,
+    const fallbackId = `HD-${Math.floor(2050 + Math.random() * 50)}`;
+    const newRecord: TicketRecord = [
+      fallbackId,
       createSubject.trim(),
       createRequester.trim(),
       createPriority,
       'Open',
       'Support Queue',
-    ]);
+    ];
+
+    try {
+      const created = await helpdeskrApi.createTicket({
+        subject: createSubject.trim(),
+        requester: createRequester.trim(),
+        priority: createPriority,
+        assigned_to: 'Support Queue',
+      });
+      const rec = converters.ticketToRecord(created);
+      onAddTicket(rec);
+      setLiveTickets((prev) => [rec, ...prev]);
+      showMessage(`Ticket ${rec[0]} registered in database via API.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      onAddTicket(newRecord);
+      setLiveTickets((prev) => [newRecord, ...prev]);
+      showMessage(`Ticket created locally (${msg}).`);
+    }
+
     setIsCreateOpen(false);
     setCreateRequester('');
     setCreateSubject('');
     setCreatePriority('Normal');
-    showMessage('Ticket created in demo data.');
   };
 
   const handleOpenTicketModal = (index: number) => {
     setSelectedTicketIndex(index);
-    setTicketNewStatus(tickets[index][4]);
-  };
-
-  const handleSaveTicketStatus = () => {
-    if (selectedTicketIndex !== null) {
-      onUpdateTicketStatus(selectedTicketIndex, ticketNewStatus);
-      setSelectedTicketIndex(null);
-      showMessage('Ticket updated.');
+    if (liveTickets[index]) {
+      setTicketNewStatus(liveTickets[index][4]);
     }
   };
 
-  const filteredTickets = tickets.filter((t) => {
+  // 2. UPDATE TICKET STATUS
+  const handleSaveTicketStatus = async () => {
+    if (selectedTicketIndex !== null && liveTickets[selectedTicketIndex]) {
+      const ticket = liveTickets[selectedTicketIndex];
+      const ticketId = ticket[0];
+      try {
+        await helpdeskrApi.updateTicketStatus(ticketId, ticketNewStatus);
+        showMessage(`Ticket ${ticketId} status updated to ${ticketNewStatus} via API.`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        showMessage(`Ticket updated locally (${msg}).`);
+      }
+      onUpdateTicketStatus(selectedTicketIndex, ticketNewStatus);
+      setLiveTickets((prev) =>
+        prev.map((t, idx) =>
+          idx === selectedTicketIndex
+            ? [t[0], t[1], t[2], t[3], ticketNewStatus, t[5]]
+            : t
+        )
+      );
+      setSelectedTicketIndex(null);
+    }
+  };
+
+  // 3. DELETE TICKET
+  const handleDeleteTicket = async (ticketId: string) => {
+    try {
+      await helpdeskrApi.deleteTicket(ticketId);
+      showMessage(`Ticket ${ticketId} deleted from database via API.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showMessage(`Ticket deleted locally (${msg}).`);
+    }
+    if (onDeleteTicket) {
+      onDeleteTicket(ticketId);
+    }
+    setLiveTickets((prev) => prev.filter((t) => t[0] !== ticketId));
+    setSelectedTicketIndex(null);
+  };
+
+  // 4. TRIGGER BULK EXPORT (CREATE EXPORT)
+  const handleTriggerExport = async () => {
+    setIsTriggeringExport(true);
+    try {
+      const exp = await helpdeskrApi.createExport({
+        target: 'All Support Tickets & Depot Attachments',
+        caller_ip: '198.18.7.41',
+      });
+      setLiveExports((prev) => [exp, ...prev]);
+      showMessage(`Bulk Export ${exp.id} initiated via API by ${exp.actor || 'system'}.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showMessage(`Export triggered locally (${msg}).`);
+    } finally {
+      setIsTriggeringExport(false);
+    }
+  };
+
+  // 5. DELETE EXPORT (ANTI-FORENSICS DELETION)
+  const handleDeleteExport = async (jobId: string) => {
+    try {
+      await helpdeskrApi.deleteExport(jobId);
+      setLiveExports((prev) => prev.filter((j) => j.id !== jobId));
+      showMessage(`Export Job ${jobId} deleted via API.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showMessage(`Export deletion note: ${msg}`);
+    }
+  };
+
+  const filteredTickets = liveTickets.filter((t) => {
     if (!searchTerm) return true;
     const q = searchTerm.toLowerCase();
     return t.some((field) => field.toLowerCase().includes(q));
@@ -125,6 +276,17 @@ export function HelpDeskrView({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadHelpDeskrData}
+            disabled={isLoading}
+            className="text-xs border-slate-300"
+            title="Refresh database records"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Sync DB
+          </Button>
           <Badge variant="warn" className="text-xs">
             ● Tenant Time: IST (UTC+5:30)
           </Badge>
@@ -146,26 +308,28 @@ export function HelpDeskrView({
           <TabsTrigger value="audithistory" className="py-2">Audit History</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Tickets */}
+        {/* Tab 1: Tickets (Full CRUD: List, Search, Create, Update, Delete) */}
         <TabsContent value="tickets">
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
-              <div>
+              <div className="min-w-0">
                 <CardTitle className="text-sm font-bold text-slate-900">
                   Support Tickets & Service Queues
                 </CardTitle>
-                <CardDescription className="text-xs">
-                  Customer inquiries and internal tickets across depots.
+                <CardDescription className="text-xs text-slate-500 mt-0.5">
+                  Full CRUD enabled: create, search, inspect status, and delete tickets.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                  <Input
+              <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+                <div className="helpdeskr-search-wrapper">
+                  <Search className="helpdeskr-search-icon" />
+                  <input
+                    id="helpdeskr-ticket-search"
+                    aria-label="Search tickets"
                     placeholder="Search tickets..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 text-xs h-9"
+                    className="helpdeskr-search-input"
                   />
                 </div>
                 <Button
@@ -187,7 +351,7 @@ export function HelpDeskrView({
                     <TableHead className="w-[100px]">Priority</TableHead>
                     <TableHead className="w-[110px]">Status</TableHead>
                     <TableHead className="w-[140px]">Assigned Queue</TableHead>
-                    <TableHead className="w-[90px]">Action</TableHead>
+                    <TableHead className="w-[120px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -230,15 +394,26 @@ export function HelpDeskrView({
                         </Badge>
                       </TableCell>
                       <TableCell className="align-top text-xs text-slate-600">{row[5]}</TableCell>
-                      <TableCell className="align-top">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenTicketModal(i)}
-                          className="text-xs h-7 px-2"
-                        >
-                          Inspect
-                        </Button>
+                      <TableCell className="align-top text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenTicketModal(i)}
+                            className="text-xs h-7 px-2"
+                          >
+                            Inspect
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTicket(row[0])}
+                            className="text-xs h-7 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                            title="Delete ticket"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -372,7 +547,7 @@ export function HelpDeskrView({
           </div>
         </TabsContent>
 
-        {/* Tab 3: Export Jobs */}
+        {/* Tab 3: Export Jobs (Create, Read, Delete / Anti-Forensics) */}
         <TabsContent value="exports">
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
@@ -382,72 +557,108 @@ export function HelpDeskrView({
                   HelpDeskr Bulk Export Audit Trail (E02 & E06 Reconciliation)
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Reconciliation of all 14 August export jobs matching Invoice <code>INV-HD-2026-0831</code> (5 plan + 9 billed @ ₹2,500 = ₹22,500 overage).
+                  Reconciliation of all 14 August export jobs matching Invoice <code>INV-HD-2026-0831</code>.
                 </CardDescription>
               </div>
-              <Badge variant="risk" className="text-xs shrink-0">
-                10 Attacker Jobs · 4 Legitimate Jobs
-              </Badge>
+              <Button
+                size="sm"
+                onClick={handleTriggerExport}
+                disabled={isTriggeringExport}
+                className="bg-rose-700 hover:bg-rose-800 text-white text-xs shrink-0"
+              >
+                <DownloadCloud className="w-3.5 h-3.5 mr-1" />
+                {isTriggeringExport ? 'Triggering...' : 'Trigger Bulk Export'}
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[120px]">Job ID</TableHead>
-                    <TableHead className="w-[160px]">Created Time (IST / UTC)</TableHead>
                     <TableHead className="w-[140px]">Principal</TableHead>
                     <TableHead className="w-[130px]">Caller IP</TableHead>
-                    <TableHead className="w-[120px]">Records</TableHead>
-                    <TableHead className="w-[150px]">Classification</TableHead>
-                    <TableHead className="w-[130px]">Status</TableHead>
-                    <TableHead>Forensic Proof</TableHead>
+                    <TableHead className="w-[140px]">Target</TableHead>
+                    <TableHead className="w-[110px]">Status</TableHead>
+                    <TableHead className="w-[90px] text-right">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {EXPORT_JOBS_E02_E06.map((job) => (
+                  {/* Dynamic Exports from Backend */}
+                  {liveExports.map((job) => (
                     <TableRow
-                      key={job.jobId}
-                      className={
-                        job.status === 'Stuck on Delete'
-                          ? 'bg-rose-100/70 font-semibold'
-                          : job.type === 'Malicious Batch Export'
-                          ? 'bg-rose-50/40'
-                          : undefined
-                      }
+                      key={job.id}
+                      className={job.id === 'EXP-5419' ? 'bg-rose-100/70 font-semibold' : undefined}
                     >
-                      <TableCell className="font-mono text-xs font-bold">
-                        {job.jobId}
-                        {job.status === 'Stuck on Delete' && (
+                      <TableCell className="font-mono text-xs font-bold text-rose-950">
+                        {job.id}
+                        {job.id === 'EXP-5419' && (
                           <div className="text-[9px] font-bold text-rose-800">
-                            SMOKING GUN TRACE
+                            ANTI-FORENSICS TARGET
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        <div className="font-bold text-slate-900">{job.createdTimeIst} IST</div>
-                        <div className="text-[11px] text-slate-500">{job.createdTimeUtc} UTC</div>
-                      </TableCell>
                       <TableCell>
-                        <code className="text-xs font-mono font-bold">{job.requester}</code>
+                        <code className="text-xs font-mono font-bold">{job.actor || 'tb-sync-svc'}</code>
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{job.callerIp}</TableCell>
-                      <TableCell className="font-bold text-xs">{job.recordsCount.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={job.type === 'Malicious Batch Export' ? 'risk' : 'ok'} className="text-[10px]">
-                          {job.type}
-                        </Badge>
-                      </TableCell>
+                      <TableCell className="font-mono text-xs">{job.caller_ip || '198.18.7.41'}</TableCell>
+                      <TableCell className="text-xs">{job.target || 'Tickets & Attachments'}</TableCell>
                       <TableCell>
                         <Badge
-                          variant={job.status === 'Stuck on Delete' ? 'risk' : job.status === 'Completed' ? 'warn' : 'ok'}
+                          variant={job.status === 'Completed' ? 'ok' : 'risk'}
                           className="text-[10px]"
                         >
                           {job.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs text-slate-600">{job.notes}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteExport(job.id)}
+                          className="text-xs h-7 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          title="Delete export job"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
+
+                  {/* Fallback Historical Case Rows */}
+                  {liveExports.length === 0 &&
+                    EXPORT_JOBS_E02_E06.slice(0, 5).map((job) => (
+                      <TableRow
+                        key={job.jobId}
+                        className={job.status === 'Stuck on Delete' ? 'bg-rose-100/70 font-semibold' : undefined}
+                      >
+                        <TableCell className="font-mono text-xs font-bold">
+                          {job.jobId}
+                        </TableCell>
+                        <TableCell>
+                          <code className="text-xs font-mono">{job.requester}</code>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{job.callerIp}</TableCell>
+                        <TableCell className="text-xs">Tickets Dump ({job.recordsCount} recs)</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={job.status === 'Stuck on Delete' ? 'risk' : 'ok'}
+                            className="text-[10px]"
+                          >
+                            {job.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteExport(job.jobId)}
+                            className="text-xs h-7 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -656,47 +867,83 @@ export function HelpDeskrView({
         <TabsContent value="audithistory">
           <Card>
             <CardHeader className="p-4">
-              <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <History className="w-4 h-4 text-slate-500" />
-                HelpDeskr Audit Log Extract (E02)
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Key events extracted from the 25,390 rows in E02.
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <History className="w-4 h-4 text-slate-500" />
+                    HelpDeskr Audit Log Extract (E02)
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Live audit events streamed from PostgreSQL helpdeskr audit table.
+                  </CardDescription>
+                </div>
+                <Badge variant="ok" className="text-xs font-mono">
+                  {liveAudit.length} Logged Events
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[150px]">Time (IST)</TableHead>
+                    <TableHead className="w-[170px]">Event ID</TableHead>
                     <TableHead className="w-[140px]">Actor</TableHead>
-                    <TableHead className="w-[130px]">IP Address</TableHead>
                     <TableHead className="w-[140px]">Event</TableHead>
-                    <TableHead className="w-[120px]">Target Object</TableHead>
+                    <TableHead className="w-[160px]">Target Object</TableHead>
                     <TableHead>Result & Note</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[
-                    ['12 Aug 00:33:14', 'tb-sync-svc', '198.18.7.58', 'export.delete', 'EXP-5419', 'Timeout (Error) — Preserved Forensics'],
-                    ['11 Aug 23:59:02', 'tb-sync-svc', '198.18.7.58', 'export.create', 'EXP-5418', 'Success'],
-                    ['11 Aug 23:30:10', 'tb-sync-svc', '198.18.7.41', 'export.create', 'EXP-5410', 'Success (First bulk exfil)'],
-                    ['11 Aug 09:15:00', 's.iyer', '172.16.4.22', 'export.create', 'EXP-5409', 'Success (Normal Tuesday export)'],
-                    ['25 Jun 11:31:00', 's.iyer', '172.16.4.22', 'comment.create', 'TKT-48213', 'Success (Key bvk-7f3a Pasted)'],
-                  ].map((r, i) => (
-                    <TableRow key={i} className={r[5].includes('Timeout') ? 'bg-rose-50/70 font-semibold' : undefined}>
-                      <TableCell className="font-mono text-xs font-bold">{r[0]}</TableCell>
-                      <TableCell><code className="text-xs font-bold">{r[1]}</code></TableCell>
-                      <TableCell className="font-mono text-xs">{r[2]}</TableCell>
-                      <TableCell className="font-bold text-xs">{r[3]}</TableCell>
-                      <TableCell><code className="text-xs">{r[4]}</code></TableCell>
+                  {/* Dynamic Audit Rows */}
+                  {liveAudit.map((log) => (
+                    <TableRow
+                      key={log.id}
+                      className={log.event?.includes('delete') ? 'bg-rose-50/70 font-semibold' : undefined}
+                    >
+                      <TableCell className="font-mono text-xs font-bold text-slate-900">
+                        {log.id}
+                      </TableCell>
+                      <TableCell><code className="text-xs font-bold">{log.actor || 'anonymous'}</code></TableCell>
+                      <TableCell className="font-bold text-xs">{log.event}</TableCell>
+                      <TableCell><code className="text-xs">{log.object_ref}</code></TableCell>
                       <TableCell>
-                        <Badge variant={r[5].includes('Timeout') ? 'risk' : r[5].includes('Normal') ? 'ok' : 'warn'} className="text-[10px]">
-                          {r[5]}
+                        <Badge
+                          variant={log.result === 'Success' ? 'ok' : 'risk'}
+                          className="text-[10px]"
+                        >
+                          {log.result}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
+
+                  {/* Fallback Historical Seed Rows */}
+                  {liveAudit.length === 0 && (
+                    <>
+                      <TableRow className="bg-rose-50/70 font-semibold">
+                        <TableCell className="font-mono text-xs font-bold">evt-12a003314</TableCell>
+                        <TableCell><code className="text-xs font-bold">tb-sync-svc</code></TableCell>
+                        <TableCell className="font-bold text-xs">export.delete</TableCell>
+                        <TableCell><code className="text-xs">EXP-5419</code></TableCell>
+                        <TableCell>
+                          <Badge variant="risk" className="text-[10px]">
+                            Timeout (Preserved in Forensics)
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell className="font-mono text-xs font-bold">evt-11a233010</TableCell>
+                        <TableCell><code className="text-xs font-bold">tb-sync-svc</code></TableCell>
+                        <TableCell className="font-bold text-xs">export.create</TableCell>
+                        <TableCell><code className="text-xs">EXP-5410</code></TableCell>
+                        <TableCell>
+                          <Badge variant="ok" className="text-[10px]">
+                            Success (First bulk exfil)
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    </>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -704,12 +951,12 @@ export function HelpDeskrView({
         </TabsContent>
       </Tabs>
 
-      {/* Create Ticket Dialog (shadcn Dialog) */}
+      {/* Create Ticket Dialog */}
       <Dialog
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         title="Create Support Ticket"
-        description="Submit a new customer inquiry into HelpDeskr queues."
+        description="Submit a new customer inquiry into HelpDeskr queues via API."
       >
         <form onSubmit={handleCreateTicket} className="space-y-4">
           <div className="space-y-1.5">
@@ -747,19 +994,19 @@ export function HelpDeskrView({
         </form>
       </Dialog>
 
-      {/* Inspect Ticket Dialog */}
-      {selectedTicketIndex !== null && tickets[selectedTicketIndex] && (
+      {/* Inspect Ticket Dialog (Update & Delete) */}
+      {selectedTicketIndex !== null && liveTickets[selectedTicketIndex] && (
         <Dialog
           isOpen={true}
           onClose={() => setSelectedTicketIndex(null)}
-          title={`Ticket ${tickets[selectedTicketIndex][0]}`}
-          description={`Requester: ${tickets[selectedTicketIndex][2]}`}
+          title={`Ticket ${liveTickets[selectedTicketIndex][0]}`}
+          description={`Requester: ${liveTickets[selectedTicketIndex][2]}`}
         >
           <div className="space-y-4">
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <div className="text-xs font-semibold text-slate-500">SUBJECT</div>
               <div className="text-sm font-bold text-slate-900 mt-0.5">
-                {tickets[selectedTicketIndex][1]}
+                {liveTickets[selectedTicketIndex][1]}
               </div>
             </div>
             <div className="space-y-1.5">
@@ -774,13 +1021,24 @@ export function HelpDeskrView({
                 <option>Resolved</option>
               </select>
             </div>
-            <Button
-              type="button"
-              onClick={handleSaveTicketStatus}
-              className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
-            >
-              Save Changes
-            </Button>
+            <div className="flex items-center gap-2 pt-2">
+              <Button
+                type="button"
+                onClick={handleSaveTicketStatus}
+                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
+              >
+                Save Changes
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleDeleteTicket(liveTickets[selectedTicketIndex][0])}
+                className="border-rose-300 text-rose-600 hover:bg-rose-50 text-xs font-bold"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                Delete Ticket
+              </Button>
+            </div>
           </div>
         </Dialog>
       )}

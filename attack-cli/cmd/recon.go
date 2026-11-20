@@ -29,7 +29,7 @@ Audits key lifetime, permissions over-scoping, and the absence of IP/CIDR restri
 		gray := utils.ColorSlate
 		reset := utils.ColorReset
 
-		utils.PrintInfo("Target Endpoint : %s/v2/me", targetBaseURL)
+		utils.PrintInfo("Target Endpoint : %s/api/v2/me", targetBaseURL)
 		utils.PrintInfo("Credential Used : %s (TallyBridge Sync Machine Key)", apiKey)
 		utils.PrintInfo("Origin IP       : %s (Simulated Internet Staging Ingress)", sourceIP)
 		fmt.Println()
@@ -43,13 +43,25 @@ Audits key lifetime, permissions over-scoping, and the absence of IP/CIDR restri
 		utils.PrintSuccess("RECON COMPLETED: Machine identity disclosed over-privileged scopes with ZERO restrictions!")
 
 		// Pro Cyber HUD Card
+		identity := data["identity"]
+		if identity == nil {
+			identity = data["key_id"]
+		}
+		permissions := data["permissions"]
+		if permissions == nil {
+			permissions = data["scope"]
+		}
+		system := data["system"]
+		if system == nil {
+			system = "LedgerOne Financials"
+		}
 		cardLines := []string{
-			fmt.Sprintf(" Service Principal : %s%v%s", white, data["identity"], reset),
+			fmt.Sprintf(" Service Principal : %s%v%s", white, identity, reset),
 			fmt.Sprintf(" Machine Key ID    : %s%v%s  %s[ACTIVE / VALID]%s", yellow, data["key_id"], reset, green, reset),
-			fmt.Sprintf(" Key Permissions   : %s%v%s", cyan, data["permissions"], reset),
+			fmt.Sprintf(" Key Permissions   : %s%v%s", cyan, permissions, reset),
 			fmt.Sprintf(" IP Restrictions   : %sNONE (0.0.0.0/0 - Open to the Internet!)%s", red, reset),
 			fmt.Sprintf(" Token Expiration  : %sNULL / NEVER (Infinite Lifetime - Policy Violation)%s", red, reset),
-			fmt.Sprintf(" Target Subsystem  : %s%v%s", white, data["system"], reset),
+			fmt.Sprintf(" Target Subsystem  : %s%v%s", white, system, reset),
 			fmt.Sprintf(" Exploit Verdict   : %s[✔ EXPLOITED: MACHINE IDENTITY COMPROMISED]%s", green, reset),
 		}
 		utils.DrawBox("📡 MACHINE IDENTITY & RECONNAISSANCE PROFILE", cardLines, cyan, 80)

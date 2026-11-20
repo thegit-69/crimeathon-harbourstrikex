@@ -124,7 +124,7 @@ func renderPostingUI() {
 		bResp, reset, utils.PadRight(fmt.Sprintf(" %s1%s  {", dim, reset), 66), bResp, reset)
 
 	fmt.Printf("  %s│%s %s %s│%s  %s│%s %s %s│%s\n",
-		bLeft, reset, utils.PadRight(fmt.Sprintf("At Risk: %sINR 1,845,000%s", coral, reset), 34), bLeft, reset,
+		bLeft, reset, utils.PadRight(fmt.Sprintf("At Risk: %sINR 248,000%s", coral, reset), 34), bLeft, reset,
 		bResp, reset, utils.PadRight(fmt.Sprintf(" %s2%s    %s\"status\"%s: %s\"SUCCESS\"%s,", dim, reset, cyan, reset, green, reset), 66), bResp, reset)
 
 	fmt.Printf("  %s│%s %s %s│%s  %s│%s %s %s│%s\n",
@@ -141,7 +141,7 @@ func renderPostingUI() {
 
 	fmt.Printf("  %s│%s %s %s│%s  %s│%s %s %s│%s\n",
 		bLeft, reset, utils.PadRight("Chennai Hub SIMATS", 34), bLeft, reset,
-		bResp, reset, utils.PadRight(fmt.Sprintf(" %s6%s    %s\"funds_diverted\"%s: %s\"INR 1,845,000 on Sept 8\"%s", dim, reset, cyan, reset, amber, reset), 66), bResp, reset)
+		bResp, reset, utils.PadRight(fmt.Sprintf(" %s6%s    %s\"funds_diverted\"%s: %s\"INR 248,000 on Sept 8\"%s", dim, reset, cyan, reset, amber, reset), 66), bResp, reset)
 
 	fmt.Printf("  %s│%s %s %s│%s  %s│%s %s %s│%s\n",
 		bLeft, reset, utils.PadRight("", 34), bLeft, reset,
