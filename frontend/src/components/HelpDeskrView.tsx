@@ -312,22 +312,24 @@ export function HelpDeskrView({
         <TabsContent value="tickets">
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
-              <div>
+              <div className="min-w-0">
                 <CardTitle className="text-sm font-bold text-slate-900">
                   Support Tickets & Service Queues
                 </CardTitle>
-                <CardDescription className="text-xs">
+                <CardDescription className="text-xs text-slate-500 mt-0.5">
                   Full CRUD enabled: create, search, inspect status, and delete tickets.
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                  <Input
+              <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+                <div className="helpdeskr-search-wrapper">
+                  <Search className="helpdeskr-search-icon" />
+                  <input
+                    id="helpdeskr-ticket-search"
+                    aria-label="Search tickets"
                     placeholder="Search tickets..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 text-xs h-9"
+                    className="helpdeskr-search-input"
                   />
                 </div>
                 <Button

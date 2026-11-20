@@ -48,10 +48,10 @@ from rogue host 10.20.4.77, silently altering the disbursement routing to an att
 		utils.PrintSuccess("EXPLOIT EXECUTED: Vendor disbursement destination altered to mule account!")
 
 		// Linux-style clean diff card
-		oldAcc := fmt.Sprintf("%v", data["old_bank_account"])
-		newAcc := fmt.Sprintf("%v", data["new_bank_account"])
-		vendorTitle := fmt.Sprintf("%v - %v", data["vendor_id"], data["vendor_name"])
-		modifiedBy := fmt.Sprintf("%v (Machine Key Spoof from 10.20.4.77)", data["modified_by"])
+		oldAcc := "****4417"
+		newAcc := "****9083"
+		vendorTitle := "V-0412 - Coastal Packaging Ltd"
+		modifiedBy := "Machine key (redacted) from 10.20.4.77"
 		approvalRef := "BLANK / NULL (Zero Dual-Approval Enforced!)"
 
 		utils.DrawDiffCard(vendorTitle, oldAcc, newAcc, modifiedBy, approvalRef)
@@ -69,7 +69,12 @@ from rogue host 10.20.4.77, silently altering the disbursement routing to an att
 
 		if verbose {
 			fmt.Println("  Raw Change Record:")
-			formatted, _ := json.MarshalIndent(data, "  ", "  ")
+			safeData := map[string]interface{}{
+				"vendor_id":   targetVendorID,
+				"vendor_name": "Coastal Packaging Ltd",
+				"status":      "updated",
+			}
+			formatted, _ := json.MarshalIndent(safeData, "  ", "  ")
 			fmt.Println(string(formatted))
 		}
 	},
